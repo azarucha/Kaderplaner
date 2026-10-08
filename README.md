@@ -22,6 +22,9 @@ mitbieten kann.
 
 ## Was die App kann
 
+- **Aufstellung planen:** Formation wählen (3-4-3 bis 5-4-1), Spieler aufs Feld
+  setzen oder die beste Elf nach Punkteschnitt füllen lassen. Wer auf der Bank sitzt,
+  lässt sich mit einem Tipp komplett zum Verkauf vormerken.
 - **Kader planen:** Spieler zum Verkauf markieren, Marktspieler mit eigenem Gebot
   vormerken. Kontostand, Spielraum bis zur 33%-Grenze, Kader- und Vereinslimit
   rechnen sofort mit.

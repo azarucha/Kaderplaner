@@ -118,7 +118,7 @@
       budget:0, players:[], sell:{}, market:[], bids:{},
       managers:[], overview:null, clubNames:{}, nextKickoff:null, matchday:null,
       estimates:null, estLoading:false, estError:false, estProgress:"", showCalc:false,
-      openManager:null, managerSquads:{}, tab:null, loading:false
+      openManager:null, managerSquads:{}, tab:null, loading:false, lineup:null
     };
   }
   var state = initialState();
@@ -282,9 +282,10 @@
         return {
           id: String(p.i || p.pi), name: p.n || p.pn || "Unbekannt", pos: POS_MAP[p.pos] || "–",
           mv: p.mv || 0, gain: p.mvgl, day: p.tfhmvt, ap: p.ap, status: p.st || 0,
-          offers: p.ofc || 0, tid: p.tid
+          offers: p.ofc || 0, tid: p.tid, lo: p.lo || 0
         };
       });
+      initLineup();
 
       state.market = ((market && market.it) || []).map(function(p){
         return {
@@ -308,6 +309,7 @@
       });
 
       var sub = [cpiLabel(cpi).replace('BL', 'Bundesliga')];
+      if (state.overview && state.overview.mgc) sub.push(state.overview.mgc + ' Manager');
       if (state.matchday) sub.push('Spieltag ' + state.matchday);
       if (state.nextKickoff) sub.push('Anpfiff ' + dateFmt.format(new Date(state.nextKickoff)));
       els.pageSub.textContent = sub.filter(Boolean).join(' · ');
@@ -441,11 +443,146 @@
     '</div>';
   }
 
+  // ---------- Aufstellung ----------
+  // Reine Planung: aendert nichts in Kickbase. Wer nicht auf dem Feld steht, sitzt
+  // auf der Bank und kann dort mit einem Tipp zum Verkauf vorgemerkt werden.
+  var FORMATIONS = ['3-4-3', '3-5-2', '3-6-1', '4-2-4', '4-3-3', '4-4-2', '4-5-1', '5-2-3', '5-3-2', '5-4-1'];
+  var LINE_ORDER = ['ANG', 'MF', 'ABW', 'TW'];   // von oben (Sturm) nach unten (Tor)
+  var kaderView = 'pitch';
+  try { kaderView = localStorage.getItem('kp_kader_view') || 'pitch'; } catch(e){}
+
+  function formationCounts(f){
+    var n = f.split('-').map(Number);
+    return {TW: 1, ABW: n[0], MF: n[1], ANG: n[2]};
+  }
+  function playerById(id){ return state.players.filter(function(p){ return p.id === id; })[0] || null; }
+  function emptySlots(f){
+    var c = formationCounts(f), s = {};
+    POS_ORDER.forEach(function(pos){ s[pos] = new Array(c[pos]).fill(null); });
+    return s;
+  }
+  function placedIds(){
+    var ids = {};
+    if (!state.lineup) return ids;
+    POS_ORDER.forEach(function(pos){ state.lineup.slots[pos].forEach(function(id){ if (id) ids[id] = true; }); });
+    return ids;
+  }
+  // Spieler in die Plaetze einer Formation verteilen; was nicht passt, geht auf die Bank.
+  function buildLineup(f, ids){
+    var slots = emptySlots(f), used = {};
+    ids.forEach(function(id){
+      var p = playerById(id);
+      if (!p || used[id] || state.sell[id] || !slots[p.pos]) return;
+      var free = slots[p.pos].indexOf(null);
+      if (free >= 0){ slots[p.pos][free] = id; used[id] = true; }
+    });
+    return {formation: f, slots: slots};
+  }
+  function bestIds(){
+    return state.players.filter(function(p){ return !state.sell[p.id]; })
+      .sort(function(a, b){ return (b.ap || 0) - (a.ap || 0) || b.mv - a.mv; })
+      .map(function(p){ return p.id; });
+  }
+  function saveLineup(){
+    if (demo || !state.league || !state.lineup) return;
+    try { localStorage.setItem('kp_lineup_' + state.league.i, JSON.stringify(state.lineup)); } catch(e){}
+  }
+  function initLineup(){
+    var stored = null;
+    if (!demo){ try { stored = JSON.parse(localStorage.getItem('kp_lineup_' + state.league.i) || 'null'); } catch(e){} }
+    if (stored && FORMATIONS.indexOf(stored.formation) >= 0){
+      var ids = [];
+      POS_ORDER.forEach(function(pos){ (stored.slots[pos] || []).forEach(function(id){ if (id) ids.push(id); }); });
+      state.lineup = buildLineup(stored.formation, ids);
+      return;
+    }
+    // Sonst die echte Aufstellung aus Kickbase (Feld lo im Kader), falls sie passt
+    var current = state.players.filter(function(p){ return p.lo > 0; }).sort(function(a, b){ return a.lo - b.lo; });
+    var c = {TW: 0, ABW: 0, MF: 0, ANG: 0};
+    current.forEach(function(p){ if (c[p.pos] != null) c[p.pos]++; });
+    var f = c.ABW + '-' + c.MF + '-' + c.ANG;
+    if (current.length === 11 && c.TW === 1 && FORMATIONS.indexOf(f) >= 0){
+      state.lineup = buildLineup(f, current.map(function(p){ return p.id; }));
+    } else {
+      state.lineup = buildLineup('4-4-2', bestIds());
+    }
+  }
+  function setFormation(f){
+    var ids = [];
+    LINE_ORDER.slice().reverse().forEach(function(pos){ state.lineup.slots[pos].forEach(function(id){ if (id) ids.push(id); }); });
+    // Bisherige Elf behalten, neu entstandene Luecken mit den besten Bankspielern fuellen
+    state.lineup = buildLineup(f, ids.concat(bestIds()));
+    saveLineup();
+  }
+  function assignSlot(pos, i, id){
+    var slots = state.lineup.slots, prev = slots[pos][i];
+    // Steht der Spieler schon auf einem anderen Platz, tauschen die beiden
+    POS_ORDER.forEach(function(ps){
+      slots[ps].forEach(function(x, j){ if (x === id && !(ps === pos && j === i)) slots[ps][j] = prev; });
+    });
+    slots[pos][i] = id;
+    saveLineup();
+  }
+
+  function lineupHtml(compact){
+    var lu = state.lineup, placed = placedIds();
+    var html = '<div class="formations" role="group" aria-label="Formation">' + FORMATIONS.map(function(f){
+      return '<button type="button" class="chip' + (f === lu.formation ? ' on' : '') + '" data-formation="' + f + '">' + f + '</button>';
+    }).join('') + '</div>';
+
+    var count = 0, points = 0, value = 0;
+    html += '<div class="pitch">' + LINE_ORDER.map(function(pos){
+      return '<div class="line">' + lu.slots[pos].map(function(id, i){
+        var p = id && playerById(id);
+        if (!p) return '<button type="button" class="slot empty" data-slot="' + pos + ':' + i + '" aria-label="' + POS_LABEL[pos] + ' wählen"><span class="av">+</span><span class="sn">' + pos + '</span></button>';
+        count++; points += p.ap || 0; value += p.mv;
+        return '<button type="button" class="slot" data-slot="' + pos + ':' + i + '"><span class="av num">' + (p.ap != null ? p.ap : '–') + '</span>' +
+          '<span class="sn">' + escapeHtml(p.name) + '</span><span class="sv num">' + short(p.mv) + '</span></button>';
+      }).join('') + '</div>';
+    }).join('') + '</div>';
+
+    html += '<div class="pitch-meta num"><span>' + count + ' / 11 · ≈ ' + Math.round(points).toLocaleString('de-DE') + ' P/Spieltag · ' + short(value) + '</span>' +
+      '<span><button type="button" class="text-btn" id="lineupAuto">Beste Elf</button></span></div>';
+    if (count < 11) html += '<p class="pitch-hint">' + (11 - count) + ' Platz' + (11 - count > 1 ? 'e' : '') + ' leer: Jeder leere Platz kostet 100 Punkte.</p>';
+
+    var bench = state.players.filter(function(p){ return !placed[p.id]; })
+      .sort(function(a, b){ return POS_ORDER.indexOf(a.pos) - POS_ORDER.indexOf(b.pos) || b.mv - a.mv; });
+    var benchValue = bench.reduce(function(s, p){ return s + p.mv; }, 0);
+    var allSold = bench.length && bench.every(function(p){ return state.sell[p.id]; });
+    html += '<div class="bench-head num"><span><b>Bank</b> · ' + bench.length + ' Spieler · ' + short(benchValue) + '</span>' +
+      (bench.length ? '<button type="button" class="btn' + (allSold ? ' on' : '') + '" id="benchSell">' + (allSold ? 'Alle zurück' : 'Alle verkaufen') + '</button>' : '') + '</div>';
+    if (!bench.length) html += '<p class="pitch-hint">Alle Spieler stehen auf dem Feld.</p>';
+    bench.forEach(function(p){ html += squadRow(p, true); });
+    return html;
+  }
+
+  function openSlotSheet(pos, i){
+    var placed = placedIds(), current = state.lineup.slots[pos][i];
+    var list = state.players.filter(function(p){ return p.pos === pos && !state.sell[p.id]; })
+      .sort(function(a, b){ return (b.ap || 0) - (a.ap || 0); });
+    var html = '<h3>' + POS_LABEL[pos] + ' wählen</h3>' + list.map(function(p){
+      var tag = p.id === current ? 'aufgestellt hier' : (placed[p.id] ? 'tauscht Platz' : 'Bank');
+      return '<button type="button" class="item' + (p.id === current ? ' on' : '') + '" data-assign="' + p.id + '">' + escapeHtml(p.name) +
+        '<span class="num">Ø ' + (p.ap != null ? p.ap : '–') + ' · ' + short(p.mv) + ' · ' + tag + '</span></button>';
+    }).join('');
+    if (!list.length) html += '<p class="sheet-note">Kein ' + POS_LABEL[pos] + ' im Kader (verkaufte Spieler zählen nicht).</p>';
+    if (current) html += '<button type="button" class="item danger" id="slotClear">Platz leeren</button>';
+    openSheet(html);
+    each('#sheet [data-assign]', function(b){
+      b.addEventListener('click', function(){ assignSlot(pos, i, b.getAttribute('data-assign')); closeSheet(); render(); });
+    });
+    var clear = $('slotClear');
+    if (clear) clear.addEventListener('click', function(){ state.lineup.slots[pos][i] = null; saveLineup(); closeSheet(); render(); });
+  }
+
   function squadPanel(compact){
     var total = state.players.reduce(function(s, p){ return s + p.mv; }, 0);
     var html = '<section class="panel"><div class="panel-head"><h2>Kader</h2><span class="num">' +
       (compact ? short(total) : (state.nextKickoff ? 'Anpfiff ' + dateFmt.format(new Date(state.nextKickoff)) : short(total))) + '</span></div>';
     if (!state.players.length) return html + '<div class="empty">Keine Spieler im Kader.</div></section>';
+    html += '<div class="seg" role="group" aria-label="Ansicht"><button type="button" data-kview="pitch" class="' + (kaderView === 'pitch' ? 'on' : '') + '">Aufstellung</button>' +
+      '<button type="button" data-kview="list" class="' + (kaderView === 'list' ? 'on' : '') + '">Liste</button></div>';
+    if (kaderView === 'pitch' && state.lineup) return html + lineupHtml(compact) + '</section>';
     POS_ORDER.concat(["–"]).forEach(function(pos){
       var list = state.players.filter(function(p){ return p.pos === pos; });
       if (!list.length) return;
@@ -624,13 +761,52 @@
   }
 
   // ---------- Ereignisse im Inhaltsbereich ----------
+  // Verkaufte Spieler verlassen das Feld
+  function removeFromLineup(id){
+    if (!state.lineup) return;
+    POS_ORDER.forEach(function(pos){
+      state.lineup.slots[pos].forEach(function(x, j){ if (x === id) state.lineup.slots[pos][j] = null; });
+    });
+    saveLineup();
+  }
+
   function bindBody(){
     each('#body [data-sell]', function(b){
       b.addEventListener('click', function(){
         var id = b.getAttribute('data-sell');
-        if (state.sell[id]) delete state.sell[id]; else state.sell[id] = true;
+        if (state.sell[id]) delete state.sell[id];
+        else { state.sell[id] = true; removeFromLineup(id); }
         render();
       });
+    });
+    each('#body [data-kview]', function(b){
+      b.addEventListener('click', function(){
+        kaderView = b.getAttribute('data-kview');
+        try { localStorage.setItem('kp_kader_view', kaderView); } catch(e){}
+        render();
+      });
+    });
+    each('#body [data-formation]', function(b){
+      b.addEventListener('click', function(){ setFormation(b.getAttribute('data-formation')); render(); });
+    });
+    each('#body [data-slot]', function(b){
+      b.addEventListener('click', function(){
+        var s = b.getAttribute('data-slot').split(':');
+        openSlotSheet(s[0], +s[1]);
+      });
+    });
+    var auto = $('lineupAuto');
+    if (auto) auto.addEventListener('click', function(){
+      state.lineup = buildLineup(state.lineup.formation, bestIds());
+      saveLineup(); render();
+    });
+    var benchSell = $('benchSell');
+    if (benchSell) benchSell.addEventListener('click', function(){
+      var placed = placedIds();
+      var bench = state.players.filter(function(p){ return !placed[p.id]; });
+      var allSold = bench.every(function(p){ return state.sell[p.id]; });
+      bench.forEach(function(p){ if (allSold) delete state.sell[p.id]; else state.sell[p.id] = true; });
+      render();
     });
     each('#body [data-buy]', function(b){
       b.addEventListener('click', function(){
@@ -672,7 +848,7 @@
   els.leagueBtn.addEventListener('click', function(){
     openSheet('<h3>Liga wählen</h3>' + state.leagues.map(function(l, i){
       var on = state.league && String(state.league.i) === String(l.i);
-      return '<button type="button" class="item' + (on ? ' on' : '') + '" data-pick="' + i + '">' + escapeHtml(l.n || 'Liga') + '<span>' + cpiLabel(l.cpi) + (l.un != null ? ' · ' + l.un + ' Manager' : '') + '</span></button>';
+      return '<button type="button" class="item' + (on ? ' on' : '') + '" data-pick="' + i + '">' + escapeHtml(l.n || 'Liga') + '<span>' + cpiLabel(l.cpi) + '</span></button>';
     }).join(''));
     each('#sheet [data-pick]', function(b){
       b.addEventListener('click', function(){ closeSheet(); openLeague(state.leagues[+b.getAttribute('data-pick')]); });
