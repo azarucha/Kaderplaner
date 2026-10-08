@@ -23,7 +23,7 @@ new Function(fs.readFileSync(path.join(root, 'tools/mock.js'), 'utf8'))();
 Object.keys = realKeys;
 
 // --- Scriptable-Nachbildung
-const keychain = noToken ? {} : { 'kaderplaner.kickbase.token': store.kb_token };
+const keychain = noToken ? {} : { 'kaderplaner.kickbase.token': store.kp_demo_token };
 const lines = [];
 const node = (kind, depth) => {
   const n = {

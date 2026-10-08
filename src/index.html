@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kaderplaner</title>
 <meta name="theme-color" content="#121014">
+<!--__HEAD__-->
 <style>
 /*__CSS__*/
 </style>
@@ -19,22 +20,25 @@
       <h1>Kaderplaner</h1>
       <p>Kontostand, Limits und die Bietkraft deiner Gegner auf einen Blick.</p>
     </div>
-    <div>
-      <label class="field-label" for="tokenInput">Kickbase-Token</label>
-      <textarea id="tokenInput" placeholder="eyJhbGciOi…" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
-    </div>
+    <form class="login" id="loginForm" autocomplete="on">
+      <label class="field-label" for="loginEmail">Kickbase-Login</label>
+      <input id="loginEmail" type="email" name="username" autocomplete="username" placeholder="E-Mail" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+      <input id="loginPass" type="password" name="password" autocomplete="current-password" placeholder="Passwort" required>
+      <button class="btn-primary" id="loginBtn" type="submit">Anmelden</button>
+    </form>
     <div id="setupStatus"></div>
-    <button class="btn-primary" id="connectBtn">Verbinden</button>
     <details class="howto">
-      <summary>So bekommst du den Token</summary>
+      <summary>Lieber mit Token verbinden</summary>
       <ol>
         <li><strong>play.kickbase.com</strong> im Browser öffnen und einloggen.</li>
         <li>Am Desktop: F12 → „Application“ (Chrome) bzw. „Storage“ (Firefox) → Local Storage → <code>https://play.kickbase.com</code> → Eintrag <code>kb.t</code>.</li>
         <li>Den Wert (beginnt mit <code>eyJ…</code>) komplett kopieren und hier einfügen.</li>
-        <li>Der Token läuft nach einigen Tagen ab. Dann die Schritte wiederholen.</li>
       </ol>
+      <textarea id="tokenInput" placeholder="eyJhbGciOi…" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+      <button class="btn-secondary" id="connectBtn" type="button">Mit Token verbinden</button>
     </details>
-    <p class="footer-note">Der Token bleibt auf diesem Gerät und geht nur an die Kickbase-API. Die App liest nur, sie bietet und verkauft nichts.</p>
+    <a class="demo-link web-only" href="demo.html">Erst mal ansehen: Demo mit erfundenen Daten →</a>
+    <p class="footer-note">Dein Passwort geht direkt an Kickbase und wird nicht gespeichert. Auf dem Gerät bleibt nur der Zugangstoken. Die App liest nur, sie bietet und verkauft nichts.</p>
   </section>
 
   <!-- MAIN -->

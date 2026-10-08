@@ -49,6 +49,7 @@
   // In Scriptable melden kaderplaner://-Links Aenderungen an den Wrapper. Die
   // Navigationen laufen nacheinander, damit keine die vorige abbricht.
   var bridge = !!window.__KP_SCRIPTABLE;
+  var demo = !!window.__KP_DEMO;   // Demo-Modus: nichts dauerhaft speichern
   var bridgeQueue = [];
   function bridgeSend(path){
     if (!bridge) return;
@@ -65,20 +66,23 @@
     try { return localStorage.getItem('kb_token'); } catch(e){ return null; }
   }
   function persistToken(t){
+    if (demo) return;
     try { localStorage.setItem('kb_token', t); } catch(e){}
     bridgeSend('token/' + encodeURIComponent(t));
   }
   function forgetToken(){
-    try { localStorage.removeItem('kb_token'); } catch(e){}
     window.__KP_TOKEN = null;
+    if (demo){ location.href = 'index.html'; return; }
+    try { localStorage.removeItem('kb_token'); } catch(e){}
     bridgeSend('logout');
   }
   function readLeague(){
+    if (demo) return null;
     try { var v = localStorage.getItem('kp_league'); if (v) return v; } catch(e){}
     return window.__KP_LEAGUE || null;
   }
   function persistLeague(id){
-    if (readLeague() === String(id) && window.__KP_LEAGUE === String(id)) return;
+    if (demo || (readLeague() === String(id) && window.__KP_LEAGUE === String(id))) return;
     try { localStorage.setItem('kp_league', String(id)); } catch(e){}
     window.__KP_LEAGUE = String(id);
     bridgeSend('league/' + encodeURIComponent(id));
@@ -136,6 +140,39 @@
     if (stored && applyToken(stored, true)) loadLeagues();
     else show('setup');
   }
+
+  if (bridge) document.documentElement.classList.add('is-scriptable');
+
+  // Login mit E-Mail und Passwort: geht direkt an Kickbase, gespeichert wird nur
+  // der zurueckgegebene Token, nie das Passwort.
+  $('loginForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    var email = $('loginEmail').value.trim(), pass = $('loginPass').value;
+    var btn = $('loginBtn');
+    if (!email || !pass) return;
+    els.setupStatus.innerHTML = "";
+    btn.disabled = true; btn.textContent = "Melde an …";
+    fetch("https://api.kickbase.com/v4/user/login", {
+      method: "POST",
+      headers: {"Content-Type": "application/json", "Accept": "application/json"},
+      body: JSON.stringify({em: email, pass: pass, loy: false, rep: {}})
+    }).then(function(res){
+      if (res.status === 401 || res.status === 403 || res.status === 400) throw new Error("credentials");
+      if (!res.ok) throw new Error("http-" + res.status);
+      return res.json();
+    }).then(function(d){
+      var token = d && (d.tkn || d.token);
+      if (!token || !applyToken(token, false)) throw new Error("token");
+      $('loginPass').value = "";
+      persistToken(state.token);
+      loadLeagues();
+    }).catch(function(err){
+      var msg = err.message === "credentials" ? "E-Mail oder Passwort stimmt nicht."
+        : err.message === "token" ? "Kickbase hat keinen gültigen Token geliefert. Versuch es mit dem Token-Weg darunter."
+        : "Kickbase ist gerade nicht erreichbar. Prüf dein Netz und versuch es nochmal.";
+      if (!els.setupStatus.innerHTML) els.setupStatus.innerHTML = '<div class="status-msg">' + msg + '</div>';
+    }).then(function(){ btn.disabled = false; btn.textContent = "Anmelden"; });
+  });
 
   els.connectBtn.addEventListener('click', function(){
     els.setupStatus.innerHTML = "";

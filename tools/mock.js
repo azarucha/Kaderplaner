@@ -116,8 +116,18 @@
   // Unsignierter Demo-Token (kein echter Zugang), damit die App ohne Eingabe startet.
   function b64(o){ return btoa(JSON.stringify(o)).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_"); }
   var demoToken = b64({alg: "none"}) + "." + b64({"kb.uid": ME, "kb.name": "Demo Manager", exp: Math.floor(NOW / 1000) + 86400 * 365}) + ".demo";
+  window.__KP_DEMO = true;
+  if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded", function(){
+    var a = document.createElement("a");
+    a.className = "demo-badge";
+    a.href = "index.html";
+    a.innerHTML = "Demo mit erfundenen Daten · <b>Eigene Liga verbinden</b>";
+    document.body.appendChild(a);
+  });
+  // Nur im Speicher, nie in localStorage: Demo und echte App teilen sich im Web eine Origin.
+  window.__KP_TOKEN = demoToken;
   try {
-    localStorage.setItem("kb_token", demoToken);
-    Object.keys(localStorage).forEach(function(k){ if (k.indexOf("kp_md_") === 0) localStorage.removeItem(k); });
+    localStorage.setItem("kp_demo_token", demoToken);   // fuer tools/widget-harness.mjs
+    Object.keys(localStorage).forEach(function(k){ if (k.indexOf("kp_md_" + LID) === 0) localStorage.removeItem(k); });
   } catch(e){}
 })();

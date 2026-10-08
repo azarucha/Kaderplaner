@@ -61,12 +61,23 @@ Unterwegs gefunden und dokumentiert ([docs/kickbase-api-notes.md](docs/kickbase-
 
 ## Installation
 
+### Als Web-App
+
+`dist/web/` ist eine statische Web-App (PWA) ohne Server-Anteil: Login mit
+Kickbase-E-Mail und Passwort, das Passwort geht direkt an Kickbase und wird nicht
+gespeichert. Auf dem iPhone in Safari öffnen und über *Teilen → Zum Home-Bildschirm*
+installieren. Unter `demo.html` läuft dieselbe App mit erfundenen Daten, ganz ohne
+Kickbase-Konto.
+
+### Als Scriptable-App mit Widget
+
 1. [Scriptable](https://apps.apple.com/app/scriptable/id1405459188) aus dem App Store
    installieren.
 2. [`dist/Kaderplaner.js`](dist/Kaderplaner.js) in den Scriptable-Ordner in iCloud
    Drive legen (oder in Scriptable ein neues Skript anlegen und den Inhalt einfügen).
-3. Skript starten und den Kickbase-Token einfügen. Wie du ihn findest, steht in der
-   App. Er läuft nach einigen Tagen ab und muss dann neu eingefügt werden.
+3. Skript starten und mit E-Mail und Passwort anmelden (oder einen Token einfügen).
+   Der Token liegt danach in der iOS-Keychain. Er läuft nach einigen Tagen ab,
+   dann fragt die App erneut.
 
 **Widget:** Auf dem Homescreen ein Scriptable-Widget hinzufügen, als Skript
 „Kaderplaner“ wählen. Klein, Mittel und Groß werden unterstützt. Im Feld
@@ -77,8 +88,9 @@ das Widget die zuletzt in der App geöffnete Liga.
 
 ```mermaid
 flowchart LR
-  subgraph iPhone
-    W[Scriptable-Wrapper<br/>Keychain, Widget] --> V[WebView: App]
+  subgraph Gerät
+    W[Scriptable-Wrapper<br/>Keychain, Widget] --> V[App-Oberfläche<br/>WebView oder Browser]
+    P[Web-App / PWA] --> V
     V --> D[data.js<br/>API-Aufrufe, Cache]
     D --> C[calc.js<br/>33%-Regel, Prämien,<br/>Schätzung]
   end
@@ -92,7 +104,8 @@ flowchart LR
 | `src/data.js` | Lädt Transfers, Spieltage, Spielerpunkte und Prämien, rechnet die Schätzung |
 | `src/app.js`, `src/index.html`, `src/styles.css` | Oberfläche |
 | `scriptable/wrapper.js` | Scriptable-Hülle: Keychain, Widget, Brücke zur WebView |
-| `build.mjs` | Bündelt alles zu einer Datei `dist/Kaderplaner.js` |
+| `web/` | Manifest, Service Worker und Icons der Web-App |
+| `build.mjs` | Bündelt alles zu `dist/Kaderplaner.js` (Scriptable) und `dist/web/` (PWA) |
 | `tools/mock.js` | Simuliertes Kickbase-Backend mit erfundenen Daten für Demo und Tests |
 | `tools/widget-harness.mjs` | Führt das Widget in Node mit nachgebildeten Scriptable-APIs aus |
 
@@ -102,8 +115,8 @@ Voraussetzung ist Node.js 22 oder neuer, weitere Abhängigkeiten gibt es nicht.
 
 ```bash
 npm test          # Rechenlogik gegen anonymisierte Messwerte einer echten Liga
-npm run build     # dist/Kaderplaner.js, dist/index.html, dist/demo.html
-npm run demo      # Demo-Modus auf http://localhost:8787/dist/demo.html
+npm run build     # dist/Kaderplaner.js und die Web-App in dist/web/
+npm run demo      # Web-App auf http://localhost:8787 (Demo unter demo.html)
 npm run widget    # Widget-Aufbau gegen das Demo-Backend ausgeben
 npm run deploy    # bauen und in den iCloud-Scriptable-Ordner kopieren
 ```

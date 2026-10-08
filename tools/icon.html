@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="de">
+<head><meta charset="utf-8"><title>Icon-Generator</title>
+<style>body{ background:#222; color:#eee; font:14px system-ui; padding:16px; } canvas{ margin:6px; border-radius:12px; }</style>
+</head>
+<body>
+<p id="status">Erzeuge Icons …</p>
+<div id="out"></div>
+<script>
+// Zeichnet das App-Icon und speichert es ueber tools/devserver.mjs nach web/icons/.
+function draw(size, maskable){
+  var c = document.createElement('canvas');
+  c.width = c.height = size;
+  var x = c.getContext('2d');
+  var g = x.createLinearGradient(0, 0, size, size);
+  g.addColorStop(0, '#ff5a1f'); g.addColorStop(1, '#7b2ff7');
+  x.fillStyle = g; x.fillRect(0, 0, size, size);
+  // dezenter Glanz oben links
+  var r = x.createRadialGradient(size * .25, size * .2, 0, size * .25, size * .2, size * .8);
+  r.addColorStop(0, 'rgba(255,255,255,.22)'); r.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = r; x.fillRect(0, 0, size, size);
+  var scale = maskable ? .78 : 1;   // maskable: Inhalt in der sicheren Zone halten
+  x.fillStyle = '#fff';
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.font = '800 ' + Math.round(size * .40 * scale) + 'px -apple-system, "Segoe UI", Roboto, sans-serif';
+  x.fillText('KP', size / 2, size * .50);
+  // Bietkraft-Balken als Wiedererkennung
+  var bw = size * .46 * scale, bh = size * .055 * scale, by = size * (.5 + .23 * scale);
+  x.fillStyle = 'rgba(255,255,255,.35)';
+  roundRect(x, size / 2 - bw / 2, by, bw, bh, bh / 2); x.fill();
+  x.fillStyle = '#fff';
+  roundRect(x, size / 2 - bw / 2, by, bw * .68, bh, bh / 2); x.fill();
+  return c;
+}
+function roundRect(x, l, t, w, h, r){
+  x.beginPath(); x.moveTo(l + r, t); x.arcTo(l + w, t, l + w, t + h, r); x.arcTo(l + w, t + h, l, t + h, r);
+  x.arcTo(l, t + h, l, t, r); x.arcTo(l, t, l + w, t, r); x.closePath();
+}
+var jobs = [['icon-192.png', 192, false], ['icon-512.png', 512, false], ['icon-maskable-512.png', 512, true], ['apple-touch-icon.png', 180, false]];
+Promise.all(jobs.map(function(j){
+  var c = draw(j[1], j[2]);
+  document.getElementById('out').appendChild(c);
+  return new Promise(function(res){ c.toBlob(res, 'image/png'); })
+    .then(function(b){ return fetch('/__save/' + j[0], {method: 'POST', body: b}); });
+})).then(function(){ document.getElementById('status').textContent = 'gespeichert'; })
+  .catch(function(e){ document.getElementById('status').textContent = 'Fehler: ' + e.message; });
+</script>
+</body>
+</html>

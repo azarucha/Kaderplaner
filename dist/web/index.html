@@ -5,6 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kaderplaner</title>
 <meta name="theme-color" content="#121014">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kaderplaner">
+<meta name="description" content="Kaderplaner für Kickbase: Kontostand, 33%-Limit und Bietkraft der Gegner auf einen Blick.">
+<script>
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    window.addEventListener("load", function(){ navigator.serviceWorker.register("sw.js"); });
+  }
+</script>
+
 <style>
 /* Kaderplaner - Design "Matchday" */
 :root{
@@ -53,6 +67,15 @@ textarea#tokenInput{ width:100%; min-height:92px; resize:vertical; background:va
 textarea#tokenInput:focus{ outline:2px solid var(--acc); outline-offset:2px; }
 .btn-primary{ width:100%; padding:15px; border-radius:16px; font-weight:800; font-size:15px; color:#fff; background:linear-gradient(135deg,var(--acc),var(--acc2)); }
 .btn-primary:disabled{ opacity:.55; }
+.login{ display:flex; flex-direction:column; gap:10px; }
+.login input{ width:100%; font:16px inherit; font-family:inherit; padding:14px; border-radius:14px; border:1px solid var(--line); background:var(--surf); color:var(--ink); }
+.login input:focus{ outline:2px solid var(--acc); outline-offset:1px; }
+.btn-secondary{ width:100%; margin-top:10px; padding:12px; border-radius:14px; font-weight:800; font-size:14px; background:var(--surf2); }
+details.howto textarea#tokenInput{ margin-top:12px; min-height:72px; }
+.demo-link{ text-align:center; font-weight:800; font-size:14px; color:var(--acc); text-decoration:none; }
+.is-scriptable .web-only{ display:none !important; }
+.demo-badge{ position:fixed; bottom:calc(max(14px, env(safe-area-inset-bottom)) + 64px); left:50%; transform:translateX(-50%); z-index:50; background:var(--ink); color:var(--bg); font-size:11.5px; font-weight:800; padding:6px 12px; border-radius:20px; text-decoration:none; box-shadow:0 6px 18px -8px rgba(0,0,0,.5); white-space:nowrap; }
+.demo-badge b{ color:var(--acc); }
 details.howto{ background:var(--surf); border-radius:16px; padding:14px 16px; }
 details.howto summary{ font-weight:700; font-size:14px; list-style:none; display:flex; justify-content:space-between; }
 details.howto summary::-webkit-details-marker{ display:none; }
@@ -179,22 +202,25 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
       <h1>Kaderplaner</h1>
       <p>Kontostand, Limits und die Bietkraft deiner Gegner auf einen Blick.</p>
     </div>
-    <div>
-      <label class="field-label" for="tokenInput">Kickbase-Token</label>
-      <textarea id="tokenInput" placeholder="eyJhbGciOi…" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
-    </div>
+    <form class="login" id="loginForm" autocomplete="on">
+      <label class="field-label" for="loginEmail">Kickbase-Login</label>
+      <input id="loginEmail" type="email" name="username" autocomplete="username" placeholder="E-Mail" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+      <input id="loginPass" type="password" name="password" autocomplete="current-password" placeholder="Passwort" required>
+      <button class="btn-primary" id="loginBtn" type="submit">Anmelden</button>
+    </form>
     <div id="setupStatus"></div>
-    <button class="btn-primary" id="connectBtn">Verbinden</button>
     <details class="howto">
-      <summary>So bekommst du den Token</summary>
+      <summary>Lieber mit Token verbinden</summary>
       <ol>
         <li><strong>play.kickbase.com</strong> im Browser öffnen und einloggen.</li>
         <li>Am Desktop: F12 → „Application“ (Chrome) bzw. „Storage“ (Firefox) → Local Storage → <code>https://play.kickbase.com</code> → Eintrag <code>kb.t</code>.</li>
         <li>Den Wert (beginnt mit <code>eyJ…</code>) komplett kopieren und hier einfügen.</li>
-        <li>Der Token läuft nach einigen Tagen ab. Dann die Schritte wiederholen.</li>
       </ol>
+      <textarea id="tokenInput" placeholder="eyJhbGciOi…" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+      <button class="btn-secondary" id="connectBtn" type="button">Mit Token verbinden</button>
     </details>
-    <p class="footer-note">Der Token bleibt auf diesem Gerät und geht nur an die Kickbase-API. Die App liest nur, sie bietet und verkauft nichts.</p>
+    <a class="demo-link web-only" href="demo.html">Erst mal ansehen: Demo mit erfundenen Daten →</a>
+    <p class="footer-note">Dein Passwort geht direkt an Kickbase und wird nicht gespeichert. Auf dem Gerät bleibt nur der Zugangstoken. Die App liest nur, sie bietet und verkauft nichts.</p>
   </section>
 
   <!-- MAIN -->
@@ -769,6 +795,7 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
   // In Scriptable melden kaderplaner://-Links Aenderungen an den Wrapper. Die
   // Navigationen laufen nacheinander, damit keine die vorige abbricht.
   var bridge = !!window.__KP_SCRIPTABLE;
+  var demo = !!window.__KP_DEMO;   // Demo-Modus: nichts dauerhaft speichern
   var bridgeQueue = [];
   function bridgeSend(path){
     if (!bridge) return;
@@ -785,20 +812,23 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
     try { return localStorage.getItem('kb_token'); } catch(e){ return null; }
   }
   function persistToken(t){
+    if (demo) return;
     try { localStorage.setItem('kb_token', t); } catch(e){}
     bridgeSend('token/' + encodeURIComponent(t));
   }
   function forgetToken(){
-    try { localStorage.removeItem('kb_token'); } catch(e){}
     window.__KP_TOKEN = null;
+    if (demo){ location.href = 'index.html'; return; }
+    try { localStorage.removeItem('kb_token'); } catch(e){}
     bridgeSend('logout');
   }
   function readLeague(){
+    if (demo) return null;
     try { var v = localStorage.getItem('kp_league'); if (v) return v; } catch(e){}
     return window.__KP_LEAGUE || null;
   }
   function persistLeague(id){
-    if (readLeague() === String(id) && window.__KP_LEAGUE === String(id)) return;
+    if (demo || (readLeague() === String(id) && window.__KP_LEAGUE === String(id))) return;
     try { localStorage.setItem('kp_league', String(id)); } catch(e){}
     window.__KP_LEAGUE = String(id);
     bridgeSend('league/' + encodeURIComponent(id));
@@ -856,6 +886,39 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
     if (stored && applyToken(stored, true)) loadLeagues();
     else show('setup');
   }
+
+  if (bridge) document.documentElement.classList.add('is-scriptable');
+
+  // Login mit E-Mail und Passwort: geht direkt an Kickbase, gespeichert wird nur
+  // der zurueckgegebene Token, nie das Passwort.
+  $('loginForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    var email = $('loginEmail').value.trim(), pass = $('loginPass').value;
+    var btn = $('loginBtn');
+    if (!email || !pass) return;
+    els.setupStatus.innerHTML = "";
+    btn.disabled = true; btn.textContent = "Melde an …";
+    fetch("https://api.kickbase.com/v4/user/login", {
+      method: "POST",
+      headers: {"Content-Type": "application/json", "Accept": "application/json"},
+      body: JSON.stringify({em: email, pass: pass, loy: false, rep: {}})
+    }).then(function(res){
+      if (res.status === 401 || res.status === 403 || res.status === 400) throw new Error("credentials");
+      if (!res.ok) throw new Error("http-" + res.status);
+      return res.json();
+    }).then(function(d){
+      var token = d && (d.tkn || d.token);
+      if (!token || !applyToken(token, false)) throw new Error("token");
+      $('loginPass').value = "";
+      persistToken(state.token);
+      loadLeagues();
+    }).catch(function(err){
+      var msg = err.message === "credentials" ? "E-Mail oder Passwort stimmt nicht."
+        : err.message === "token" ? "Kickbase hat keinen gültigen Token geliefert. Versuch es mit dem Token-Weg darunter."
+        : "Kickbase ist gerade nicht erreichbar. Prüf dein Netz und versuch es nochmal.";
+      if (!els.setupStatus.innerHTML) els.setupStatus.innerHTML = '<div class="status-msg">' + msg + '</div>';
+    }).then(function(){ btn.disabled = false; btn.textContent = "Anmelden"; });
+  });
 
   els.connectBtn.addEventListener('click', function(){
     els.setupStatus.innerHTML = "";
