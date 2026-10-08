@@ -340,3 +340,16 @@ test('Kontostand im Verlauf: Transfers und Spieltage mit Datum, Rest verteilt, E
   assert.equal(h[2].v, 66e6);
   assert.equal(h[3].v, 70e6);
 });
+
+test('Gebotshilfe: Median und 75%-Quantil der Aufschlaege, Vorschlag aufgerundet', () => {
+  const st = C.markupStats([
+    { price: 1.0e6, mv: 1e6 }, { price: 1.1e6, mv: 1e6 }, { price: 1.2e6, mv: 1e6 },
+    { price: 0.9e6, mv: 1e6 }, { price: 1e6, mv: 0 }
+  ]);
+  assert.equal(st.n, 4);
+  assert.ok(Math.abs(st.median - 0.05) < 1e-9);
+  assert.ok(Math.abs(st.p75 - 0.125) < 1e-9);
+  assert.equal(C.suggestBid(2e6, st), 2250000);
+  assert.equal(C.suggestBid(2e6, null), null);
+  assert.equal(C.markupStats([]), null);
+});

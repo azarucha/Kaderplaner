@@ -427,6 +427,13 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   .hist, .inact-row{ padding-left:0; padding-right:0; }
 }
 
+/* Gebotshilfe unter dem eigenen Gebot */
+.bidhint{ padding:0 20px 12px; background:var(--hi); font-size:12.5px; line-height:1.5; color:var(--mut); }
+.bidhint p + p{ margin-top:4px; }
+.bidhint b{ color:var(--ink); font-weight:600; }
+.bidhint .text-btn{ min-height:36px; }
+@media (min-width: 1000px){ .cols .bidhint{ padding:0 0 10px; } }
+
 </style>
 </head>
 <body>
@@ -1166,6 +1173,23 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     return out;
   }
 
+  // ---------- Gebotshilfe ----------
+  // Aufschlag beim Kauf = Preis / Marktwert am Kauftag - 1. Kaeufe von anderen
+  // Managern koennen unter Marktwert liegen; Median und 75%-Quantil sind dagegen robust.
+  function markupStats(list){
+    var r = (list || []).filter(function(x){ return x.mv > 0 && x.price > 0; })
+      .map(function(x){ return x.price / x.mv - 1; }).sort(function(a, b){ return a - b; });
+    if (!r.length) return null;
+    var q = function(p){ var i = (r.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i); return r[lo] + (r[hi] - r[lo]) * (i - lo); };
+    return {n: r.length, median: q(0.5), p75: q(0.75)};
+  }
+
+  // Gebot, das drei von vier bisherigen Ligakaeufen ueberboten haette (auf 10.000 aufgerundet)
+  function suggestBid(mv, stats){
+    if (!stats || !mv) return null;
+    return Math.ceil(mv * (1 + Math.max(0, stats.p75)) / 10000) * 10000;
+  }
+
   // ---------- Spieler-Detail ----------
   // Marktwertverlauf aus /players/{P}/marketvalue/92: dt ist ein Tagesindex seit
   // 1970 (zur Sicherheit auch ms oder ISO-Text). Sortiert, ohne Luecken-Eintraege.
@@ -1198,6 +1222,8 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
 
   return {
     balanceHistory: balanceHistory,
+    markupStats: markupStats,
+    suggestBid: suggestBid,
     mvSeries: mvSeries,
     mvAt: mvAt,
     matchdayPoints: matchdayPoints,
@@ -1453,6 +1479,8 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
           seasonPoints: r.dash.tp || 0, wins: r.dash.mdw || 0,
           ledger: ledger, autoSales: autoSales, counts: counts, transfers: r.transfers,
           matchdayPoints: byDay, openGain: openGain, lastTransfer: lastTransfer,
+          recentBuys: r.transfers.filter(function(t){ return t.tty === 1 && now - Date.parse(t.dt) < 45 * 86400000; })
+            .map(function(t){ return {pi: String(t.pi), price: t.trp || 0, at: Date.parse(t.dt)}; }),
           achievements: C.achievementTotal(counts, rewardInfo.rewards),
           loginLow: C.loginTotalForDays(activeDays, login.step, login.cap),
           loginHigh: loginHigh
@@ -1551,6 +1579,38 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
         return {at: at, user: t.unm || null, price: t.trp || 0, mvThen: mv ? C.mvAt(mv, at) : null};
       }).sort(function(a, b){ return b.at - a.at; }) : null;
       return {mv: mv, season: season ? season.ti : null, points: season ? C.matchdayPoints(season.ph) : null, transfers: transfers};
+    });
+  }
+
+  // Aufschlaege der juengsten Ligakaeufe: Marktwert am Kauftag aus dem Verlauf des
+  // Spielers. Hoechstens `limit` Spieler, Verlaeufe einen halben Tag im Cache.
+  // buys: [{pi, price, at, uid}] -> {all: stats, byUser: {uid: stats}}
+  var MVH_TTL = 12 * 3600000;
+  function fetchMarkups(client, leagueId, buys, limit){
+    buys = buys.slice().sort(function(a, b){ return b.at - a.at; });
+    var ids = [];
+    buys.forEach(function(b){ if (ids.indexOf(b.pi) < 0 && ids.length < (limit || 60)) ids.push(b.pi); });
+    // Ein Cache-Eintrag pro Liga, nur mit den gerade gebrauchten Spielern
+    var key = 'kp_mvh_' + leagueId, cache = cacheGet(key) || {}, hist = {}, keep = {};
+    return pool(ids, 4, function(pi){
+      var c = cache[pi];
+      if (c && Date.now() - c.at < MVH_TTL){ hist[pi] = c.s; keep[pi] = c; return; }
+      return client.get("/leagues/" + leagueId + "/players/" + pi + "/marketvalue/92").then(function(d){
+        hist[pi] = C.mvSeries(d && d.it);
+        keep[pi] = {at: Date.now(), s: hist[pi]};
+      }).catch(function(){});
+    }).then(function(){
+      cacheSet(key, keep);
+      var all = [], byUser = {};
+      buys.forEach(function(b){
+        if (!hist[b.pi]) return;
+        var x = {price: b.price, mv: C.mvAt(hist[b.pi], b.at)};
+        all.push(x);
+        (byUser[b.uid] = byUser[b.uid] || []).push(x);
+      });
+      var out = {all: C.markupStats(all), byUser: {}};
+      Object.keys(byUser).forEach(function(u){ out.byUser[u] = C.markupStats(byUser[u]); });
+      return out;
     });
   }
 
@@ -1714,7 +1774,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     return {games: games, factor: C.horizonFactor(games.map(function(g){ return g.f; }), horizon)};
   }
 
-  root.KBData = { createClient: createClient, pool: pool, estimateAll: estimateAll, fetchTransfers: fetchTransfers, fetchForms: fetchForms, fetchPlayerDetail: fetchPlayerDetail,
+  root.KBData = { createClient: createClient, pool: pool, estimateAll: estimateAll, fetchTransfers: fetchTransfers, fetchForms: fetchForms, fetchPlayerDetail: fetchPlayerDetail, fetchMarkups: fetchMarkups,
     fetchOpponentModel: fetchOpponentModel, buildOpponentModel: buildOpponentModel, fixturesFor: fixturesFor, mapTeams: mapTeams, normName: normName };
 })(typeof self !== 'undefined' ? self : this);
 
@@ -2010,7 +2070,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       managers:[], overview:null, clubNames:{}, nextKickoff:null, matchday:null,
       estimates:null, estLoading:false, estError:false, estProgress:"", showCalc:false,
       openManager:null, managerSquads:{}, tab:null, loading:false, lineup:null, forms:null,
-      pick:null, lineupNote:null, opp:null, oppLoading:false, kbTeams:[],
+      pick:null, lineupNote:null, opp:null, oppLoading:false, kbTeams:[], markups:null, markupsLoading:false,
       hideInactive: (function(){ try { return !!localStorage.getItem('kp_hide_inactive'); } catch(e){ return false; } })()
     };
   }
@@ -2230,7 +2290,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
 
   els.refreshBtn.addEventListener('click', function(){
     if (state.loading) return;
-    state.estimates = null; state.estError = false; state.managerSquads = {};
+    state.estimates = null; state.estError = false; state.managerSquads = {}; state.markups = null; state.markupsLoading = false;
     loadLeague();
   });
 
@@ -2261,7 +2321,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     if (!state.league || state.loading && !state.players.length) return;
     renderSummary();
     var t = currentTab();
-    if ((t === 'gegner' || t === 'overview') && !state.estimates && !state.estLoading && !state.estError) loadEstimates();
+    if ((t === 'gegner' || t === 'overview' || t === 'markt') && !state.estimates && !state.estLoading && !state.estError) loadEstimates();
     var html;
     if (t === 'overview') html = '<div class="cols">' + squadPanel(true) + marketPanel(true) + managersPanel(true) + '</div>';
     else if (t === 'markt') html = marketPanel(false);
@@ -2819,8 +2879,49 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     if (marked){
       var over = p.mv ? Math.round((state.bids[p.id] / p.mv - 1) * 100) : 0;
       html += '<label class="bidrow num">Dein Gebot <input data-bid="' + p.id + '" inputmode="numeric" value="' + state.bids[p.id].toLocaleString('de-DE') + '"> € · ' + (over >= 0 ? '+' : '') + over + ' %</label>';
+      if (!p.by) html += bidHintHtml(p);
     }
     return html;
+  }
+
+  // ---------- Gebotshilfe ----------
+  // Wie viel die Liga zuletzt ueber Marktwert gezahlt hat und wer bei diesem Spieler
+  // mitbieten kann. Braucht die Kontostands-Schaetzung.
+  function loadMarkups(){
+    var l = state.league, est = state.estimates;
+    if (!est || state.markupsLoading) return;
+    var buys = [];
+    Object.keys(est.byUser).forEach(function(uid){
+      (est.byUser[uid].recentBuys || []).forEach(function(b){ buys.push({pi: b.pi, price: b.price, at: b.at, uid: uid}); });
+    });
+    state.markupsLoading = true;
+    KBData.fetchMarkups(client, l.i, buys, 60).then(function(res){
+      if (state.league !== l) return;
+      state.markups = res; state.markupsLoading = false;
+      render();
+    }).catch(function(){ state.markupsLoading = false; });
+  }
+
+  function pctText(x){ var v = Math.round(x * 100); return (v >= 0 ? '+' : '−') + Math.abs(v) + ' %'; }
+
+  function bidHintHtml(p){
+    var mk = state.markups;
+    if (!state.estimates) return '<div class="bidhint">Wer mitbieten kann, steht hier, sobald die Kontostände berechnet sind.</div>';
+    if (!mk) return state.markupsLoading ? '<div class="bidhint">Lade die Aufschläge der Liga …</div>' : '';
+    var lines = [];
+    if (mk.all) lines.push('Die Liga zahlt im Mittel <b>' + pctText(mk.all.median) + '</b> auf den Marktwert (' + mk.all.n + ' Käufe, 45 Tage).');
+    var rivals = managerRows().filter(function(r){ return r.e && !r.m.isMe && !r.full && r.powerHi >= p.mv; })
+      .sort(function(a, b){ return b.power - a.power; });
+    if (!rivals.length) lines.push('Keiner der anderen kann gerade mitbieten.');
+    else lines.push('Mitbieten können ' + rivals.slice(0, 3).map(function(r){
+      var own = mk.byUser[r.m.id];
+      return escapeHtml(r.m.name) + (own && own.n >= 3 ? ' (zahlt ' + pctText(own.median) + ')' : '');
+    }).join(', ') + (rivals.length > 3 ? ' und ' + (rivals.length - 3) + ' weitere' : '') + '.');
+    var sug = C.suggestBid(p.mv, mk.all);
+    var btn = sug && sug !== state.bids[p.id]
+      ? '<button type="button" class="text-btn" data-suggest="' + p.id + '" data-amount="' + sug + '">Übernehmen</button>' : '';
+    if (sug) lines.push('Vorschlag <b>' + short(sug) + '</b>: mehr als in drei von vier Ligakäufen.');
+    return '<div class="bidhint">' + lines.map(function(x){ return '<p>' + x + '</p>'; }).join('') + btn + '</div>';
   }
 
   function marketPanel(compact){
@@ -2857,6 +2958,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     }).then(function(res){
       if (state.league !== l) return;
       state.estimates = res; state.estLoading = false;
+      loadMarkups();
       render();
     }).catch(function(err){
       if (state.league !== l) return;
@@ -3243,6 +3345,9 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
         saveLineup();
         render();
       });
+    });
+    each('#body [data-suggest]', function(b){
+      b.addEventListener('click', function(){ state.bids[b.getAttribute('data-suggest')] = +b.getAttribute('data-amount'); render(); });
     });
     each('#body [data-bid]', function(inp){
       inp.addEventListener('change', function(){

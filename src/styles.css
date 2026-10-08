@@ -402,3 +402,10 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
 @media (min-width: 1000px){
   .hist, .inact-row{ padding-left:0; padding-right:0; }
 }
+
+/* Gebotshilfe unter dem eigenen Gebot */
+.bidhint{ padding:0 20px 12px; background:var(--hi); font-size:12.5px; line-height:1.5; color:var(--mut); }
+.bidhint p + p{ margin-top:4px; }
+.bidhint b{ color:var(--ink); font-weight:600; }
+.bidhint .text-btn{ min-height:36px; }
+@media (min-width: 1000px){ .cols .bidhint{ padding:0 0 10px; } }

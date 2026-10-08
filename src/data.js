@@ -216,6 +216,8 @@
           seasonPoints: r.dash.tp || 0, wins: r.dash.mdw || 0,
           ledger: ledger, autoSales: autoSales, counts: counts, transfers: r.transfers,
           matchdayPoints: byDay, openGain: openGain, lastTransfer: lastTransfer,
+          recentBuys: r.transfers.filter(function(t){ return t.tty === 1 && now - Date.parse(t.dt) < 45 * 86400000; })
+            .map(function(t){ return {pi: String(t.pi), price: t.trp || 0, at: Date.parse(t.dt)}; }),
           achievements: C.achievementTotal(counts, rewardInfo.rewards),
           loginLow: C.loginTotalForDays(activeDays, login.step, login.cap),
           loginHigh: loginHigh
@@ -314,6 +316,38 @@
         return {at: at, user: t.unm || null, price: t.trp || 0, mvThen: mv ? C.mvAt(mv, at) : null};
       }).sort(function(a, b){ return b.at - a.at; }) : null;
       return {mv: mv, season: season ? season.ti : null, points: season ? C.matchdayPoints(season.ph) : null, transfers: transfers};
+    });
+  }
+
+  // Aufschlaege der juengsten Ligakaeufe: Marktwert am Kauftag aus dem Verlauf des
+  // Spielers. Hoechstens `limit` Spieler, Verlaeufe einen halben Tag im Cache.
+  // buys: [{pi, price, at, uid}] -> {all: stats, byUser: {uid: stats}}
+  var MVH_TTL = 12 * 3600000;
+  function fetchMarkups(client, leagueId, buys, limit){
+    buys = buys.slice().sort(function(a, b){ return b.at - a.at; });
+    var ids = [];
+    buys.forEach(function(b){ if (ids.indexOf(b.pi) < 0 && ids.length < (limit || 60)) ids.push(b.pi); });
+    // Ein Cache-Eintrag pro Liga, nur mit den gerade gebrauchten Spielern
+    var key = 'kp_mvh_' + leagueId, cache = cacheGet(key) || {}, hist = {}, keep = {};
+    return pool(ids, 4, function(pi){
+      var c = cache[pi];
+      if (c && Date.now() - c.at < MVH_TTL){ hist[pi] = c.s; keep[pi] = c; return; }
+      return client.get("/leagues/" + leagueId + "/players/" + pi + "/marketvalue/92").then(function(d){
+        hist[pi] = C.mvSeries(d && d.it);
+        keep[pi] = {at: Date.now(), s: hist[pi]};
+      }).catch(function(){});
+    }).then(function(){
+      cacheSet(key, keep);
+      var all = [], byUser = {};
+      buys.forEach(function(b){
+        if (!hist[b.pi]) return;
+        var x = {price: b.price, mv: C.mvAt(hist[b.pi], b.at)};
+        all.push(x);
+        (byUser[b.uid] = byUser[b.uid] || []).push(x);
+      });
+      var out = {all: C.markupStats(all), byUser: {}};
+      Object.keys(byUser).forEach(function(u){ out.byUser[u] = C.markupStats(byUser[u]); });
+      return out;
     });
   }
 
@@ -477,6 +511,6 @@
     return {games: games, factor: C.horizonFactor(games.map(function(g){ return g.f; }), horizon)};
   }
 
-  root.KBData = { createClient: createClient, pool: pool, estimateAll: estimateAll, fetchTransfers: fetchTransfers, fetchForms: fetchForms, fetchPlayerDetail: fetchPlayerDetail,
+  root.KBData = { createClient: createClient, pool: pool, estimateAll: estimateAll, fetchTransfers: fetchTransfers, fetchForms: fetchForms, fetchPlayerDetail: fetchPlayerDetail, fetchMarkups: fetchMarkups,
     fetchOpponentModel: fetchOpponentModel, buildOpponentModel: buildOpponentModel, fixturesFor: fixturesFor, mapTeams: mapTeams, normName: normName };
 })(typeof self !== 'undefined' ? self : this);

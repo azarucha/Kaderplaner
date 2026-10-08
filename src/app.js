@@ -119,7 +119,7 @@
       managers:[], overview:null, clubNames:{}, nextKickoff:null, matchday:null,
       estimates:null, estLoading:false, estError:false, estProgress:"", showCalc:false,
       openManager:null, managerSquads:{}, tab:null, loading:false, lineup:null, forms:null,
-      pick:null, lineupNote:null, opp:null, oppLoading:false, kbTeams:[],
+      pick:null, lineupNote:null, opp:null, oppLoading:false, kbTeams:[], markups:null, markupsLoading:false,
       hideInactive: (function(){ try { return !!localStorage.getItem('kp_hide_inactive'); } catch(e){ return false; } })()
     };
   }
@@ -339,7 +339,7 @@
 
   els.refreshBtn.addEventListener('click', function(){
     if (state.loading) return;
-    state.estimates = null; state.estError = false; state.managerSquads = {};
+    state.estimates = null; state.estError = false; state.managerSquads = {}; state.markups = null; state.markupsLoading = false;
     loadLeague();
   });
 
@@ -370,7 +370,7 @@
     if (!state.league || state.loading && !state.players.length) return;
     renderSummary();
     var t = currentTab();
-    if ((t === 'gegner' || t === 'overview') && !state.estimates && !state.estLoading && !state.estError) loadEstimates();
+    if ((t === 'gegner' || t === 'overview' || t === 'markt') && !state.estimates && !state.estLoading && !state.estError) loadEstimates();
     var html;
     if (t === 'overview') html = '<div class="cols">' + squadPanel(true) + marketPanel(true) + managersPanel(true) + '</div>';
     else if (t === 'markt') html = marketPanel(false);
@@ -928,8 +928,49 @@
     if (marked){
       var over = p.mv ? Math.round((state.bids[p.id] / p.mv - 1) * 100) : 0;
       html += '<label class="bidrow num">Dein Gebot <input data-bid="' + p.id + '" inputmode="numeric" value="' + state.bids[p.id].toLocaleString('de-DE') + '"> € · ' + (over >= 0 ? '+' : '') + over + ' %</label>';
+      if (!p.by) html += bidHintHtml(p);
     }
     return html;
+  }
+
+  // ---------- Gebotshilfe ----------
+  // Wie viel die Liga zuletzt ueber Marktwert gezahlt hat und wer bei diesem Spieler
+  // mitbieten kann. Braucht die Kontostands-Schaetzung.
+  function loadMarkups(){
+    var l = state.league, est = state.estimates;
+    if (!est || state.markupsLoading) return;
+    var buys = [];
+    Object.keys(est.byUser).forEach(function(uid){
+      (est.byUser[uid].recentBuys || []).forEach(function(b){ buys.push({pi: b.pi, price: b.price, at: b.at, uid: uid}); });
+    });
+    state.markupsLoading = true;
+    KBData.fetchMarkups(client, l.i, buys, 60).then(function(res){
+      if (state.league !== l) return;
+      state.markups = res; state.markupsLoading = false;
+      render();
+    }).catch(function(){ state.markupsLoading = false; });
+  }
+
+  function pctText(x){ var v = Math.round(x * 100); return (v >= 0 ? '+' : '−') + Math.abs(v) + ' %'; }
+
+  function bidHintHtml(p){
+    var mk = state.markups;
+    if (!state.estimates) return '<div class="bidhint">Wer mitbieten kann, steht hier, sobald die Kontostände berechnet sind.</div>';
+    if (!mk) return state.markupsLoading ? '<div class="bidhint">Lade die Aufschläge der Liga …</div>' : '';
+    var lines = [];
+    if (mk.all) lines.push('Die Liga zahlt im Mittel <b>' + pctText(mk.all.median) + '</b> auf den Marktwert (' + mk.all.n + ' Käufe, 45 Tage).');
+    var rivals = managerRows().filter(function(r){ return r.e && !r.m.isMe && !r.full && r.powerHi >= p.mv; })
+      .sort(function(a, b){ return b.power - a.power; });
+    if (!rivals.length) lines.push('Keiner der anderen kann gerade mitbieten.');
+    else lines.push('Mitbieten können ' + rivals.slice(0, 3).map(function(r){
+      var own = mk.byUser[r.m.id];
+      return escapeHtml(r.m.name) + (own && own.n >= 3 ? ' (zahlt ' + pctText(own.median) + ')' : '');
+    }).join(', ') + (rivals.length > 3 ? ' und ' + (rivals.length - 3) + ' weitere' : '') + '.');
+    var sug = C.suggestBid(p.mv, mk.all);
+    var btn = sug && sug !== state.bids[p.id]
+      ? '<button type="button" class="text-btn" data-suggest="' + p.id + '" data-amount="' + sug + '">Übernehmen</button>' : '';
+    if (sug) lines.push('Vorschlag <b>' + short(sug) + '</b>: mehr als in drei von vier Ligakäufen.');
+    return '<div class="bidhint">' + lines.map(function(x){ return '<p>' + x + '</p>'; }).join('') + btn + '</div>';
   }
 
   function marketPanel(compact){
@@ -966,6 +1007,7 @@
     }).then(function(res){
       if (state.league !== l) return;
       state.estimates = res; state.estLoading = false;
+      loadMarkups();
       render();
     }).catch(function(err){
       if (state.league !== l) return;
@@ -1352,6 +1394,9 @@
         saveLineup();
         render();
       });
+    });
+    each('#body [data-suggest]', function(b){
+      b.addEventListener('click', function(){ state.bids[b.getAttribute('data-suggest')] = +b.getAttribute('data-amount'); render(); });
     });
     each('#body [data-bid]', function(inp){
       inp.addEventListener('change', function(){

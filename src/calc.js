@@ -593,6 +593,23 @@
     return out;
   }
 
+  // ---------- Gebotshilfe ----------
+  // Aufschlag beim Kauf = Preis / Marktwert am Kauftag - 1. Kaeufe von anderen
+  // Managern koennen unter Marktwert liegen; Median und 75%-Quantil sind dagegen robust.
+  function markupStats(list){
+    var r = (list || []).filter(function(x){ return x.mv > 0 && x.price > 0; })
+      .map(function(x){ return x.price / x.mv - 1; }).sort(function(a, b){ return a - b; });
+    if (!r.length) return null;
+    var q = function(p){ var i = (r.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i); return r[lo] + (r[hi] - r[lo]) * (i - lo); };
+    return {n: r.length, median: q(0.5), p75: q(0.75)};
+  }
+
+  // Gebot, das drei von vier bisherigen Ligakaeufen ueberboten haette (auf 10.000 aufgerundet)
+  function suggestBid(mv, stats){
+    if (!stats || !mv) return null;
+    return Math.ceil(mv * (1 + Math.max(0, stats.p75)) / 10000) * 10000;
+  }
+
   // ---------- Spieler-Detail ----------
   // Marktwertverlauf aus /players/{P}/marketvalue/92: dt ist ein Tagesindex seit
   // 1970 (zur Sicherheit auch ms oder ISO-Text). Sortiert, ohne Luecken-Eintraege.
@@ -625,6 +642,8 @@
 
   return {
     balanceHistory: balanceHistory,
+    markupStats: markupStats,
+    suggestBid: suggestBid,
     mvSeries: mvSeries,
     mvAt: mvAt,
     matchdayPoints: matchdayPoints,
