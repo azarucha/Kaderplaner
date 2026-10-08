@@ -5,6 +5,10 @@ Fußball-Manager Kickbase. Sie zeigt, was die Kickbase-App selbst nicht zeigt: w
 viel Geld die anderen Manager deiner Liga haben und wer bei einem Spieler überhaupt
 mitbieten kann.
 
+**[Web-App öffnen](https://azarucha.github.io/Kaderplaner/)** ·
+**[Demo ohne Konto](https://azarucha.github.io/Kaderplaner/demo.html)** ·
+[Scriptable-Datei](dist/Kaderplaner.js)
+
 > Inoffizielles Hobbyprojekt, nicht mit Kickbase verbunden. Es nutzt die nicht
 > dokumentierte Web-Schnittstelle nur lesend und kann jederzeit aufhören zu
 > funktionieren, wenn Kickbase daran etwas ändert.
@@ -67,11 +71,13 @@ Unterwegs gefunden und dokumentiert ([docs/kickbase-api-notes.md](docs/kickbase-
 
 ### Als Web-App
 
-`dist/web/` ist eine statische Web-App (PWA) ohne Server-Anteil: Login mit
-Kickbase-E-Mail und Passwort, das Passwort geht direkt an Kickbase und wird nicht
-gespeichert. Auf dem iPhone in Safari öffnen und über *Teilen → Zum Home-Bildschirm*
-installieren. Unter `demo.html` läuft dieselbe App mit erfundenen Daten, ganz ohne
-Kickbase-Konto.
+[azarucha.github.io/Kaderplaner](https://azarucha.github.io/Kaderplaner/) ist eine
+statische Web-App (PWA) ohne Server-Anteil: Login mit Kickbase-E-Mail und Passwort,
+das Passwort geht direkt an Kickbase und wird nicht gespeichert. Auf dem iPhone in
+Safari öffnen und über *Teilen → Zum Home-Bildschirm* installieren. Unter
+[`demo.html`](https://azarucha.github.io/Kaderplaner/demo.html) läuft dieselbe App
+mit erfundenen Daten, ganz ohne Kickbase-Konto. Gebaut wird sie aus `dist/web/` bei
+jedem Push auf `main`.
 
 ### Als Scriptable-App mit Widget
 
