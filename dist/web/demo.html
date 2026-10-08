@@ -334,6 +334,14 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   .sheet{ bottom:auto; top:50%; transform:translate(-50%, -50%); border-radius:16px; max-width:420px; }
 }
 
+/* Zeitraum fuer erwartete Punkte */
+.seg.sm{ margin-top:8px; }
+.seg.sm button{ min-height:30px; font-size:12.5px; }
+.horizon-note{ padding:8px 20px 0; font-size:12.5px; color:var(--mut); }
+@media (min-width: 1000px){
+  .horizon-note{ padding-left:0; padding-right:0; }
+}
+
 </style>
 </head>
 <body>
@@ -550,6 +558,24 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     return {pi: p.i, pn: p.n, pos: p.pos, tid: p.tid, mv: p.mv, ap: p.ap, st: p.st, prc: p.prc};
   }
 
+  // Spielplan (Rundenturnier, Kreismethode): Spieltage 1-6 gespielt, 7-9 kommen noch
+  var strength = {}; clubs.forEach(function(c){ strength[c.tid] = rnd() * 2 - 1; });
+  var schedule = [], ids = clubs.map(function(c){ return c.tid; });
+  function fixDate(d){ return d <= 6 ? NOW - (7 - d) * 7 * DAY : NOW + ((d - 7) * 7 + 2) * DAY + 3600000; }
+  for (var day = 1; day <= 9; day++){
+    for (var g = 0; g < 9; g++){
+      var a = ids[g], b = ids[17 - g], home = day % 2 ? a : b, away = home === a ? b : a;
+      var mt = {mi: String(day * 100 + g), day: day, md: new Date(fixDate(day)).toISOString(), t1: home, t2: away};
+      if (day <= 6){
+        mt.t1g = Math.max(0, Math.round(1.4 + 0.6 * (strength[home] - strength[away]) + rnd() * 2 - 1));
+        mt.t2g = Math.max(0, Math.round(1.1 + 0.6 * (strength[away] - strength[home]) + rnd() * 2 - 1));
+      }
+      schedule.push(mt);
+    }
+    ids.splice(1, 0, ids.pop());   // alle ausser dem ersten rotieren
+  }
+  function matchOf(tid, day){ return schedule.filter(function(m){ return m.day === day && (m.t1 === tid || m.t2 === tid); })[0]; }
+
   var routes = [
     [/^\/leagues\/selection$/, function(){ return {it: [{i: LID, n: "Demo-Liga", cpi: "2", un: managers.length}]}; }],
     [/^\/leagues\/\d+\/me$/, function(){
@@ -577,15 +603,32 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     [/^\/competitions\/\d+\/players\/(\d+)\/performance$/, function(m){
       // wie die echte API: Startelf st 5, eingewechselt st 3, ohne Einsatz "0'"
       var p = byId[m[1]] || {pts: {}}; var ph = [];
-      for (var d = 1; d <= 6; d++){
+      for (var d = 1; d <= 9; d++){
+        var mt = matchOf(p.tid, d) || {}, base = {day: d, mi: mt.mi, md: mt.md, t1: mt.t1, t2: mt.t2, t1g: mt.t1g, t2g: mt.t2g, pt: p.tid};
+        if (d > 6){ ph.push(Object.assign(base, {st: 0, t1g: undefined, t2g: undefined})); continue; }
         var pt = p.pts[d] || 0, sub = pt > 0 && pt < 40;
-        ph.push(pt > 0 ? {day: d, p: pt, mp: sub ? "25'" : "90'", st: sub ? 3 : 5} : {day: d, p: 0, mp: "0'"});
+        ph.push(Object.assign(base, pt > 0 ? {p: pt, mp: sub ? "25'" : "90'", st: sub ? 3 : 5} : {p: 0, mp: "0'", st: 4}));
       }
-      return {it: [{ti: "2026/2027", ph: ph}]}; }]
+      return {it: [{ti: "2026/2027", ph: ph}]}; }],
+    [/^\/competitions\/\d+\/teams\/(\d+)\/teamprofile$/, function(m){
+      return {tid: m[1], it: players.filter(function(p){ return p.tid === m[1]; }).map(function(p){ return {i: p.i, n: p.n, pos: p.pos, ap: p.ap, st: p.st, tid: p.tid}; })}; }]
   ];
 
   var realFetch = window.fetch;
+  // OpenLigaDB nachgebildet: dieselben erfundenen Vereine und Ergebnisse
+  function openLiga(url){
+    var mm = /getmatchdata\/(bl\d)\/(\d{4})$/.exec(url), list = [];
+    var team = function(tid){ var c = clubs.filter(function(x){ return x.tid === tid; })[0]; return {teamId: +tid, teamName: c.tn, shortName: c.tn}; };
+    if (mm && mm[1] === "bl2" && +mm[2] === new Date(NOW).getFullYear() - (new Date(NOW).getMonth() < 6 ? 1 : 0)){
+      list = schedule.map(function(x){
+        return {matchDateTimeUTC: x.md, team1: team(x.t1), team2: team(x.t2), matchIsFinished: x.t1g != null,
+          matchResults: x.t1g != null ? [{resultTypeID: 2, pointsTeam1: x.t1g, pointsTeam2: x.t2g}] : []};
+      });
+    }
+    return Promise.resolve(new Response(JSON.stringify(list), {status: 200, headers: {"Content-Type": "application/json"}}));
+  }
   window.fetch = function(url, opts){
+    if (String(url).indexOf("https://api.openligadb.de/") === 0) return openLiga(String(url));
     if (String(url).indexOf("https://api.kickbase.com/v4") !== 0) return realFetch.apply(this, arguments);
     var u = new URL(url), path = u.pathname.replace(/^\/v4/, "");
     for (var r = 0; r < routes.length; r++){
@@ -852,15 +895,148 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   //   Einsatzchance = 60 % letzte 5 Spieltage + 40 % ganze Saison
   //   Qualitaet     = je halb Saisonschnitt pro Einsatz (ap) und Schnitt der letzten Einsaetze
   // und multipliziert mit der Verfuegbarkeit. Ohne Leistungsdaten: ap x Verfuegbarkeit.
+  // Optional: p.fixture ist der Gegnerfaktor der naechsten Spiele (Standard 1), er
+  // wirkt nur auf die Qualitaet, nicht auf Einsatzchance und Verfuegbarkeit.
   function expectedPoints(p){
     var avail = availability(p.status), f = p.form;
-    if (!f || !f.teamDays || f.teamDays < 2) return (p.ap || 0) * avail;
+    var ap = p.ap;
+    var fix = p.fixture != null ? p.fixture : 1;
+    if (!f || !f.teamDays || f.teamDays < 2) return (ap || 0) * fix * avail;
     var chance = 0.6 * (f.recentApps / Math.max(1, f.recentDays)) + 0.4 * (f.apps / f.teamDays);
     var recentQ = f.recentApps ? f.recentPoints / f.recentApps : null;
-    var quality = p.ap != null
-      ? (recentQ != null ? 0.5 * p.ap + 0.5 * recentQ : p.ap)
+    var quality = ap != null
+      ? (recentQ != null ? 0.5 * ap + 0.5 * recentQ : ap)
       : (recentQ != null ? recentQ : 0);
-    return quality * chance * avail;
+    return quality * fix * chance * avail;
+  }
+
+  // ---------- Gegnerstaerke ----------
+  // Gemessen an 475 Spielern der 2. Liga (4.644 Startelf-Einsaetze, jeder Spieltag nur
+  // mit den Daten davor vorhergesagt): Ein Gegnerfaktor aus "Gegner laesst auf dieser
+  // Position viele Punkte zu" und der Teamstaerke senkt den Fehler messbar; ein
+  // eigener Gegnereffekt je Spieler oder ein getrimmter Schnitt verbessern nichts.
+  var OPP = {
+    lambda: 8,          // Teamstaerke: Zug zum Mittel (in Spielen)
+    prevSeason: 0.35,   // Gewicht der letzten Saison fuer Teamstaerke und Gegnerwerte
+    allowK: 100,        // Gegnerwert: Zug zu 0 (in Einsaetzen)
+    allowWeight: 0.7,
+    edgeWeight: 0.5,
+    // Startwerte je Position (1 TW, 2 ABW, 3 MF, 4 ANG): relative Punktaenderung pro Tor
+    // erwarteter Tordifferenz, live aus allen Spielern nachgeschaetzt
+    slope: {1: 0.13, 2: 0.38, 3: 0.43, 4: 0.7}
+  };
+
+  // matches: [{home, away, hg, ag, w}]. Modell: erwartete Tordifferenz =
+  // r[home] - r[away] + H, Ridge-Regression mit Zug zum Mittel, Tordifferenz auf +-3 gekappt.
+  function teamRatings(matches, opts){
+    opts = opts || {};
+    var lambda = opts.lambda != null ? opts.lambda : OPP.lambda, cap = opts.cap || 3;
+    var r = {}, games = {};
+    var list = (matches || []).filter(function(m){ return m.hg != null && m.ag != null && (m.w == null || m.w > 0); });
+    list.forEach(function(m){
+      [m.home, m.away].forEach(function(t){ if (r[t] == null){ r[t] = 0; games[t] = []; } });
+      games[m.home].push(m); games[m.away].push(m);
+    });
+    var gd = function(m){ return Math.max(-cap, Math.min(cap, m.hg - m.ag)); };
+    var wt = function(m){ return m.w == null ? 1 : m.w; };
+    var H = 0, teams = Object.keys(r);
+    for (var it = 0; it < 40; it++){
+      var hs = 0, hw = 0;
+      list.forEach(function(m){ hs += wt(m) * (gd(m) - r[m.home] + r[m.away]); hw += wt(m); });
+      H = hw ? hs / (hw + lambda) : 0;
+      teams.forEach(function(t){
+        var s = 0, wsum = lambda;
+        games[t].forEach(function(m){
+          s += m.home === t ? wt(m) * (gd(m) - H + r[m.away]) : wt(m) * (r[m.home] + H - gd(m));
+          wsum += wt(m);
+        });
+        r[t] = s / wsum;
+      });
+    }
+    return {r: r, home: H};
+  }
+
+  // Spielschwierigkeit aus Sicht eines Spielers, positiv = leichter. Die eigene
+  // Teamstaerke steckt schon im Punkteschnitt, deshalb zaehlen Gegner und Heimvorteil.
+  function matchEdge(ratings, opp, home){
+    if (!ratings || ratings.r[opp] == null) return null;
+    return (home ? ratings.home : -ratings.home) / 2 - ratings.r[opp];
+  }
+
+  // Wie viele Punkte laesst ein Gegner je Position zu? players: [{pos, games:
+  // [{p, opp, prev}]}] (nur Startelf). Je Einsatz: Punkte relativ zum Saisonschnitt
+  // des Spielers ohne dieses Spiel, gemittelt je Gegner und Position, zu 0 gezogen.
+  function opponentAllowance(players, opts){
+    opts = opts || {};
+    var k = opts.k != null ? opts.k : OPP.allowK, sums = {};
+    (players || []).forEach(function(pl){
+      var seasons = {};
+      (pl.games || []).forEach(function(g){ var b = seasons[g.prev ? 1 : 0] = seasons[g.prev ? 1 : 0] || {s: 0, n: 0}; b.s += g.p; b.n++; });
+      (pl.games || []).forEach(function(g){
+        var b = seasons[g.prev ? 1 : 0];
+        if (b.n < 4) return;
+        var ref = (b.s - g.p) / (b.n - 1);
+        if (ref < 20) return;
+        var w = g.prev ? OPP.prevSeason : 1, key = g.opp + '|' + pl.pos;
+        var a = sums[key] = sums[key] || {s: 0, w: 0};
+        a.s += w * Math.max(-1.5, Math.min(2.5, g.p / ref - 1)); a.w += w;
+      });
+    });
+    // Punkte/Schnitt ist im Mittel leicht positiv (Ausreisser nach oben): je Position
+    // auf 0 zentrieren, damit ein durchschnittlicher Gegner den Faktor 1 ergibt.
+    var out = {}, mean = {};
+    Object.keys(sums).forEach(function(key){
+      out[key] = sums[key].s / (sums[key].w + k);
+      var pos = key.split('|')[1], m = mean[pos] = mean[pos] || {s: 0, n: 0};
+      m.s += out[key]; m.n++;
+    });
+    Object.keys(out).forEach(function(key){ var m = mean[key.split('|')[1]]; out[key] -= m.s / m.n; });
+    return out;
+  }
+
+  // Gepoolte Punktaenderung je Tor Spielschwierigkeit fuer eine Position.
+  // entries: [{quality, games: [{p, x, w}]}]; zu `base` gezogen.
+  function positionSlope(entries, base, opts){
+    var k = opts && opts.k != null ? opts.k : 4, pts = [];
+    (entries || []).forEach(function(e){
+      if (!(e.quality >= 20)) return;
+      (e.games || []).forEach(function(g){ if (g.x != null && g.p != null) pts.push({x: g.x, y: g.p / e.quality - 1, w: g.w == null ? 1 : g.w}); });
+    });
+    if (pts.length < 10) return base;
+    var W = pts.reduce(function(s, g){ return s + g.w; }, 0);
+    var mx = pts.reduce(function(s, g){ return s + g.w * g.x; }, 0) / W;
+    var my = pts.reduce(function(s, g){ return s + g.w * g.y; }, 0) / W;
+    var sxx = 0, sxy = 0;
+    pts.forEach(function(g){ sxx += g.w * (g.x - mx) * (g.x - mx); sxy += g.w * (g.x - mx) * (g.y - my); });
+    return sxx < 1e-6 ? base : (sxy + k * base) / (sxx + k);
+  }
+
+  // Faktor fuer ein Spiel: 1 + 0,7 x Gegnerwert + 0,5 x Steigung x Schwierigkeit, 0,6..1,4.
+  function matchFactor(allow, slope, edge){
+    var f = 1 + OPP.allowWeight * (allow || 0) + (edge != null ? OPP.edgeWeight * (slope || 0) * edge : 0);
+    return Math.max(0.6, Math.min(1.4, f));
+  }
+
+  // Naechste Spiele gewichtet 50/30/20 (bei weniger Spielen neu normiert).
+  var HORIZON_WEIGHTS = [0.5, 0.3, 0.2];
+  function horizonFactor(factors, horizon){
+    var n = Math.min(horizon || 1, factors.length, HORIZON_WEIGHTS.length), s = 0, w = 0;
+    for (var i = 0; i < n; i++){ if (factors[i] == null) continue; s += HORIZON_WEIGHTS[i] * factors[i]; w += HORIZON_WEIGHTS[i]; }
+    return w ? s / w : 1;
+  }
+
+  // Konstanz aus Startelf-Einsaetzen [{p, w}]: share = Anteil der Spiele mit mindestens
+  // der Haelfte des eigenen Schnitts; label ab 5 Spielen. Aendert die Punkte nicht, dient
+  // als Anzeige und bei Gleichstand in der Verkaufsempfehlung.
+  function playerConsistency(games){
+    var items = (games || []).filter(function(g){ return g && g.p != null; });
+    var wsum = items.reduce(function(s, g){ return s + (g.w == null ? 1 : g.w); }, 0);
+    if (!items.length || !wsum) return {n: 0, mean: null, share: null, label: null};
+    var mean = items.reduce(function(s, g){ return s + g.p * (g.w == null ? 1 : g.w); }, 0) / wsum;
+    var ref = Math.max(mean, 1);
+    var share = items.reduce(function(s, g){ return s + (g.p >= 0.5 * ref ? (g.w == null ? 1 : g.w) : 0); }, 0) / wsum;
+    var label = items.length < 5 ? null : (share >= 0.75 ? 'konstant' : (share < 0.5 ? 'schwankend' : null));
+    return {n: items.length, mean: mean, share: share, label: label};
   }
 
   // Leistungsdaten aus /competitions/{cpi}/players/{id}/performance (Liste ph der
@@ -929,7 +1105,8 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     opts = opts || {};
     var maxN = opts.maxN || 20;
     // trend: Marktwertaenderung in Euro pro Tag (fallend = negativ)
-    var toEntry = function(p){ return {id: p.id, pos: p.pos, mv: p.mv || 0, pts: expectedPoints(p), trend: p.trend || 0}; };
+    // cons: Konstanz (Anteil guter Spiele, siehe playerConsistency), bei Gleichstand lieber schwankende verkaufen
+    var toEntry = function(p){ return {id: p.id, pos: p.pos, mv: p.mv || 0, pts: expectedPoints(p), trend: p.trend || 0, cons: p.cons != null ? p.cons : 0.6}; };
     var sellable = players.map(toEntry);
     // opts.fixed: Spieler, die sicher dazukommen (z. B. vorgemerkte Kaeufe) - zaehlen fuer die Elf, sind aber nicht verkaufbar
     var all = sellable.concat((opts.fixed || []).map(toEntry));
@@ -949,13 +1126,14 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
         .sort(function(a, b){ return b.pts - a.pts; });
     });
     var counts = FORMATIONS.map(formationCounts);
-    var money = new Float64Array(size), trend = new Float64Array(size), best = null, fewest = null;
+    var money = new Float64Array(size), trend = new Float64Array(size), cons = new Float64Array(size), best = null, fewest = null;
     var top = {TW: [0, 0, 0, 0, 0, 0, 0], ABW: [0, 0, 0, 0, 0, 0, 0], MF: [0, 0, 0, 0, 0, 0, 0], ANG: [0, 0, 0, 0, 0, 0, 0]};
 
     for (var mask = 1; mask < size; mask++){
       var low = mask & -mask, bit = 31 - Math.clz32(low);
       money[mask] = money[mask ^ low] + cand[bit].mv;
       trend[mask] = trend[mask ^ low] + cand[bit].trend;
+      cons[mask] = cons[mask ^ low] + cand[bit].cons;
       if (money[mask] < need) continue;
 
       // Praefixsummen der besten verbleibenden Spieler je Position (bis 6 Plaetze)
@@ -976,11 +1154,12 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       }
       var cnt = 0;
       for (var m = mask; m; m &= m - 1) cnt++;
-      // Punkte auf ganze Punkte gerundet; bei Gleichstand lieber fallende als steigende
-      // Marktwerte verkaufen, dann weniger Verkaeufe, dann mehr Geld.
-      var cand1 = {mask: mask, money: money[mask], points: pts, rp: Math.round(pts), trend: trend[mask], count: cnt, formation: form};
-      if (!best || better(cand1, best, ['rp', 'trend', 'count', 'money'])) best = cand1;
-      if (!fewest || better(cand1, fewest, ['count', 'rp', 'trend', 'money'])) fewest = cand1;
+      // Punkte auf ganze Punkte gerundet; bei Gleichstand lieber schwankende als konstante
+      // Spieler verkaufen, dann fallende statt steigende Marktwerte, dann weniger
+      // Verkaeufe, dann mehr Geld.
+      var cand1 = {mask: mask, money: money[mask], points: pts, rp: Math.round(pts), cons: Math.round(cons[mask] / cnt * 100) / 100, trend: trend[mask], count: cnt, formation: form};
+      if (!best || better(cand1, best, ['rp', 'cons', 'trend', 'count', 'money'])) best = cand1;
+      if (!fewest || better(cand1, fewest, ['count', 'rp', 'cons', 'trend', 'money'])) fewest = cand1;
     }
 
     function describe(r){
@@ -999,6 +1178,14 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     availability: availability,
     expectedPoints: expectedPoints,
     formFromPerformance: formFromPerformance,
+    OPP: OPP,
+    teamRatings: teamRatings,
+    matchEdge: matchEdge,
+    opponentAllowance: opponentAllowance,
+    positionSlope: positionSlope,
+    matchFactor: matchFactor,
+    horizonFactor: horizonFactor,
+    playerConsistency: playerConsistency,
     bestEleven: bestEleven,
     recommendSales: recommendSales,
     MINUS_RATE: MINUS_RATE,
@@ -1053,10 +1240,13 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     return Promise.all(workers).then(function(){ return results; });
   }
 
+  // Im Demo-Modus nichts speichern: Demo und echte App teilen sich im Web eine Origin.
   function cacheGet(key){
+    if (root.__KP_DEMO) return null;
     try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch(e){ return null; }
   }
   function cacheSet(key, value){
+    if (root.__KP_DEMO) return;
     try { localStorage.setItem(key, JSON.stringify(value)); } catch(e){}
   }
 
@@ -1276,7 +1466,12 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
         seasons.forEach(function(s){
           if (!cur || String(s.ti) > String(cur.ti) || (s.ti === cur.ti && (s.ph || []).length > (cur.ph || []).length)) cur = s;
         });
-        return {id: id, ph: (cur && cur.ph) || []};
+        var prev = cur && seasons.filter(function(s){ return s.ti === prevSeason(cur.ti); })[0];
+        // Konstanz: Startelf-Einsaetze dieser Saison (Gewicht 1) und der letzten (0,5)
+        var starts = [];
+        if (cur) (cur.ph || []).forEach(function(h){ if (h.st === 5 && h.p != null) starts.push({p: h.p, w: 1}); });
+        if (prev) (prev.ph || []).forEach(function(h){ if (h.st === 5 && h.p != null) starts.push({p: h.p, w: 0.5}); });
+        return {id: id, ph: (cur && cur.ph) || [], cons: C.playerConsistency(starts)};
       }).catch(function(){ return {id: id, ph: null}; });
     }).then(function(list){
       var lastDay = 0;
@@ -1284,12 +1479,177 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
         (x.ph || []).forEach(function(h){ if (h.day > lastDay && (h.p != null || h.mp)) lastDay = h.day; });
       });
       var out = {};
-      list.forEach(function(x){ if (x.ph) out[x.id] = C.formFromPerformance(x.ph, lastDay); });
+      list.forEach(function(x){
+        if (!x.ph) return;
+        out[x.id] = C.formFromPerformance(x.ph, lastDay);
+        out[x.id].cons = x.cons;
+      });
       return out;
     });
   }
 
-  root.KBData = { createClient: createClient, pool: pool, estimateAll: estimateAll, fetchTransfers: fetchTransfers, fetchForms: fetchForms };
+  function prevSeason(ti){
+    var m = /^(\d{4})\/(\d{4})$/.exec(ti || '');
+    return m ? (+m[1] - 1) + '/' + m[1] : null;
+  }
+
+  // ---------- Gegnermodell ----------
+  // Alle Spieler der Liga (Kickbase, Startelf-Einsaetze dieser und der letzten Saison)
+  // fuer "Gegner laesst Punkte zu", Ergebnisse fuer die Teamstaerke von OpenLigaDB
+  // (Ersatz: Ergebnisse aus den Kickbase-Spielerdaten). Zwischengespeichert, damit
+  // die gut 400 Abrufe nur etwa zweimal am Tag noetig sind.
+  var LEAGUE_TTL = 12 * 3600000;
+
+  function fetchLeagueHistory(client, cpi, teams){
+    var key = 'kp_lg_' + cpi, cached = cacheGet(key), now = Date.now();
+    // nach jedem Anpfiff (plus Spieldauer) neu laden, sonst hoechstens alle 12 Stunden
+    if (cached && cached.v === 1 && now - cached.at < LEAGUE_TTL && !(cached.nextKick && now > cached.nextKick + 2.5 * 3600000)) return Promise.resolve(cached);
+    var opt = function(p){ return p.catch(function(){ return null; }); };
+    return pool(teams, 4, function(t){ return opt(client.get("/competitions/" + cpi + "/teams/" + t.tid + "/teamprofile")); }).then(function(profiles){
+      var players = [];
+      profiles.forEach(function(pr, k){
+        ((pr && pr.it) || []).forEach(function(p){ if (p.ap > 0) players.push({id: String(p.i), pos: p.pos, tid: String(teams[k].tid)}); });
+      });
+      var matches = {}, nextByTeam = {}, curTi = null, nextKick = null;
+      return pool(players, 6, function(pl){
+        return opt(client.get("/competitions/" + cpi + "/players/" + pl.id + "/performance")).then(function(d){
+          var seasons = ((d && d.it) || []).filter(function(s){ return /^\d{4}\/\d{4}$/.test(s.ti); });
+          seasons.sort(function(a, b){ return a.ti < b.ti ? -1 : 1; });
+          var cur = seasons[seasons.length - 1];
+          if (!cur) return;
+          if (!curTi || cur.ti > curTi) curTi = cur.ti;
+          pl.ti = cur.ti;
+          var prev = seasons.filter(function(s){ return s.ti === prevSeason(cur.ti); })[0];
+          pl.g = [];
+          [[cur, 0], [prev, 1]].forEach(function(x){
+            if (!x[0]) return;
+            (x[0].ph || []).forEach(function(h){
+              var t = Date.parse(h.md);
+              if (h.t1g != null && h.t2g != null && h.mi) matches[h.mi] = [String(h.t1), String(h.t2), h.t1g, h.t2g, x[1], t];
+              if (h.st === 5 && h.p != null && h.pt){
+                var home = String(h.pt) === String(h.t1);
+                pl.g.push([h.p, String(home ? h.t2 : h.t1), home ? 1 : 0, x[1]]);
+              }
+              // kommende Spiele des Vereins (noch ohne Ergebnis)
+              if (x[1] === 0 && h.t1g == null && t > now){
+                var list = nextByTeam[pl.tid] = nextByTeam[pl.tid] || {};
+                var home2 = String(h.t1) === pl.tid;
+                list[h.mi || t] = [String(home2 ? h.t2 : h.t1), home2 ? 1 : 0, t];
+                if (!nextKick || t < nextKick) nextKick = t;
+              }
+            });
+          });
+        });
+      }).then(function(){
+        var next = {};
+        Object.keys(nextByTeam).forEach(function(tid){
+          next[tid] = Object.keys(nextByTeam[tid]).map(function(k){ return nextByTeam[tid][k]; }).sort(function(a, b){ return a[2] - b[2]; }).slice(0, 4);
+        });
+        var data = {v: 1, at: now, ti: curTi, nextKick: nextKick, next: next,
+          players: players.filter(function(p){ return p.g && p.ti === curTi; }).map(function(p){ return [p.id, p.pos, p.tid, p.g]; }),
+          matches: Object.keys(matches).map(function(k){ return matches[k]; })};
+        if (data.players.length) cacheSet(key, data);
+        return data;
+      });
+    });
+  }
+
+  // OpenLigaDB: oeffentliche Ergebnisse, ohne Login oder Cookies. Laufende Saison
+  // 6 Stunden zwischengespeichert, abgeschlossene Saisons dauerhaft.
+  var OPENLIGA = "https://api.openligadb.de";
+  function fetchOpenLiga(shortcut, year, current){
+    var key = 'kp_ol_' + shortcut + '_' + year, cached = cacheGet(key);
+    if (cached && (!current || Date.now() - cached.at < 6 * 3600000)) return Promise.resolve(cached);
+    return fetch(OPENLIGA + "/getmatchdata/" + shortcut + "/" + year).then(function(r){ return r.ok ? r.json() : []; }).then(function(list){
+      var teams = {}, matches = [];
+      (list || []).forEach(function(m){
+        if (!m.team1 || !m.team2) return;
+        [m.team1, m.team2].forEach(function(t){ teams[t.teamId] = [t.teamName, t.shortName]; });
+        var end = (m.matchResults || []).filter(function(r){ return r.resultTypeID === 2; })[0];
+        matches.push([String(m.team1.teamId), String(m.team2.teamId), m.matchIsFinished && end ? end.pointsTeam1 : null, m.matchIsFinished && end ? end.pointsTeam2 : null, Date.parse(m.matchDateTimeUTC)]);
+      });
+      var data = {at: Date.now(), teams: teams, matches: matches};
+      if (matches.length) cacheSet(key, data);
+      return data;
+    }).catch(function(){ return null; });
+  }
+
+  // Vereinsnamen von OpenLigaDB auf Kickbase-IDs abbilden ("Hertha BSC" = "Hertha",
+  // "SpVgg Greuther Fürth" = "Fürth"). Nicht zuordenbare Vereine behalten eine eigene Kennung.
+  function normName(s){
+    return String(s || '').toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+      .replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(function(w){ return w && !/^(fc|sv|vfl|vfb|sc|spvgg|dsc|bsc|tsg|fsv|ssv|sg|1|04|05|96|98|1846|1860|1899|1900|1907|1909)$/.test(w); }).join(' ');
+  }
+  function mapTeams(olTeams, kbTeams){
+    var map = {}, used = {};
+    var kb = kbTeams.map(function(t){ return {tid: String(t.tid), n: normName(t.tn)}; });
+    Object.keys(olTeams).forEach(function(id){
+      var full = normName(olTeams[id][0]), short = normName(olTeams[id][1]);
+      var hit = kb.filter(function(t){ return !used[t.tid] && (t.n === short || t.n === full); })[0] ||
+        kb.filter(function(t){ return !used[t.tid] && t.n && (full.indexOf(t.n) >= 0 || t.n.indexOf(short) >= 0); })[0];
+      if (hit){ map[id] = hit.tid; used[hit.tid] = true; } else map[id] = 'ol' + id;
+    });
+    return map;
+  }
+
+  // Setzt alles zusammen: Teamstaerke, Gegnerwerte je Position, Steigung je Position.
+  // kbTeams: Tabelle der Kickbase-Wettbewerbs (tid, tn).
+  function fetchOpponentModel(client, cpi, kbTeams){
+    return fetchLeagueHistory(client, cpi, kbTeams).then(function(lg){
+      var m = /^(\d{4})\//.exec(lg.ti || ''), year = m ? +m[1] : null;
+      var shortcut = String(cpi) === '1' ? 'bl1' : (String(cpi) === '2' ? 'bl2' : null);
+      var ol = year && shortcut ? Promise.all([
+        fetchOpenLiga(shortcut, year, true), fetchOpenLiga('bl1', year - 1, false), fetchOpenLiga('bl2', year - 1, false)
+      ]) : Promise.resolve([]);
+      return ol.then(function(parts){ return buildOpponentModel(lg, parts, kbTeams); });
+    });
+  }
+
+  function buildOpponentModel(lg, olParts, kbTeams){
+    var P = C.OPP, matches = [], source = 'kickbase';
+    // Ergebnisse von OpenLigaDB, wenn die laufende Saison zuordenbar ist
+    var cur = olParts && olParts[0];
+    if (cur && cur.matches.length){
+      var all = [];
+      olParts.forEach(function(part, i){
+        if (!part) return;
+        var map = mapTeams(part.teams, kbTeams);
+        part.matches.forEach(function(x){ if (x[2] != null) all.push({home: map[x[0]], away: map[x[1]], hg: x[2], ag: x[3], w: i === 0 ? 1 : P.prevSeason, cur: i === 0}); });
+      });
+      var mapped = all.filter(function(x){ return x.cur && x.home.indexOf('ol') !== 0 && x.away.indexOf('ol') !== 0; }).length;
+      if (mapped >= 9){ matches = all; source = 'openligadb'; }
+    }
+    if (!matches.length) matches = lg.matches.map(function(x){ return {home: x[0], away: x[1], hg: x[2], ag: x[3], w: x[4] ? P.prevSeason : 1}; });
+    var ratings = C.teamRatings(matches);
+
+    var players = lg.players.map(function(x){
+      return {id: x[0], pos: x[1], tid: x[2], games: x[3].map(function(g){ return {p: g[0], opp: g[1], home: !!g[2], prev: !!g[3]}; })};
+    });
+    var allow = C.opponentAllowance(players);
+    var slopes = {};
+    [1, 2, 3, 4].forEach(function(pos){
+      var entries = players.filter(function(pl){ return pl.pos === pos; }).map(function(pl){
+        var W = 0, S = 0;
+        var games = pl.games.map(function(g){ var w = g.prev ? 0.5 : 1; W += w; S += w * g.p; return {p: g.p, w: w, x: C.matchEdge(ratings, g.opp, g.home)}; });
+        return {quality: W ? S / W : null, games: games};
+      });
+      slopes[pos] = C.positionSlope(entries, P.slope[pos]);
+    });
+    return {ratings: ratings, allow: allow, slopes: slopes, next: lg.next, source: source, at: lg.at, players: players.length};
+  }
+
+  // Gegner und Faktor der naechsten Spiele fuer einen Spieler (pos 1-4, tid Verein).
+  function fixturesFor(model, pos, tid, horizon){
+    var list = ((model && model.next[String(tid)]) || []).filter(function(x){ return x[2] > Date.now() - 2 * 3600000; }).slice(0, 3);
+    var games = list.map(function(x){
+      var edge = C.matchEdge(model.ratings, x[0], !!x[1]);
+      return {opp: x[0], home: !!x[1], at: x[2], f: C.matchFactor(model.allow[x[0] + '|' + pos], model.slopes[pos], edge)};
+    });
+    return {games: games, factor: C.horizonFactor(games.map(function(g){ return g.f; }), horizon)};
+  }
+
+  root.KBData = { createClient: createClient, pool: pool, estimateAll: estimateAll, fetchTransfers: fetchTransfers, fetchForms: fetchForms,
+    fetchOpponentModel: fetchOpponentModel, buildOpponentModel: buildOpponentModel, fixturesFor: fixturesFor, mapTeams: mapTeams, normName: normName };
 })(typeof self !== 'undefined' ? self : this);
 
 (function(){
@@ -1413,7 +1773,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       managers:[], overview:null, clubNames:{}, nextKickoff:null, matchday:null,
       estimates:null, estLoading:false, estError:false, estProgress:"", showCalc:false,
       openManager:null, managerSquads:{}, tab:null, loading:false, lineup:null, forms:null,
-      pick:null, lineupNote:null
+      pick:null, lineupNote:null, opp:null, oppLoading:false, kbTeams:[]
     };
   }
   var state = initialState();
@@ -1572,6 +1932,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       var names = {};
       ((table && table.it) || []).forEach(function(t){ if (t.tid) names[t.tid] = t.tn; });
       state.clubNames = names;
+      state.kbTeams = ((table && table.it) || []).filter(function(t){ return t.tid; }).map(function(t){ return {tid: String(t.tid), tn: t.tn}; });
 
       state.players = ((squad && squad.it) || []).map(function(p){
         return {
@@ -1614,6 +1975,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       els.refreshBtn.classList.remove('spin');
       render();
       loadForms();
+      loadOpponents();
     }).catch(function(err){
       state.loading = false;
       els.refreshBtn.classList.remove('spin');
@@ -1737,9 +2099,12 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     var sub = [];
     if (withPoints && (p.ap != null || formOf(p))) sub.push('≈ ' + Math.round(expected(p)) + ' P');
     if (p.gain != null) sub.push('<span class="' + signCls(p.gain) + '">' + delta(p.gain) + ' seit Kauf</span>');
-    if (p.ap != null) sub.push('Ø ' + p.ap);
+    var c = consOf(p);
+    if (p.ap != null) sub.push('Ø ' + p.ap + (c && c.label ? ' ' + c.label : ''));
     var f = formOf(p);
     if (f && f.recentDays) sub.push(f.recentStarts + '/' + f.recentDays + ' Startelf');
+    var fxh = fixtureHtml(p);
+    if (fxh) sub.push(fxh);
     if (p.offers) sub.push(p.offers + ' Angebot' + (p.offers > 1 ? 'e' : ''));
     if (p.day != null) sub.push('<span class="' + signCls(p.day) + '">24h ' + delta(p.day) + '</span>');
     return '<div class="row' + (sold ? ' on sold' : '') + (compact ? '' : ' np') + '">' +
@@ -1766,10 +2131,68 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   // Erwartete Punkte pro Spieltag: Punkteschnitt, Form der letzten 5 Spieltage,
   // Einsatzquote und Verfuegbarkeit (siehe KBCalc.expectedPoints)
   function formOf(p){ return state.forms ? state.forms[p.id] : null; }
-  function expected(p){ return C.expectedPoints({ap: p.ap, status: p.status, form: formOf(p)}); }
+  function consOf(p){ var f = formOf(p); return f && f.cons ? f.cons : null; }
+  function expected(p){
+    var fx = fixtureOf(p);
+    return C.expectedPoints({ap: p.ap, status: p.status, form: formOf(p), fixture: fx ? fx.factor : 1});
+  }
   function calcEntry(p){
-    // trend: Marktwertaenderung der letzten 24 h (eigener Kader), fuer die Gleichstandsregel
-    return {id: p.id, pos: p.pos, mv: p.mv, ap: p.ap, status: p.status, form: formOf(p), trend: p.day || 0};
+    // trend: Marktwertaenderung der letzten 24 h (eigener Kader), cons: Konstanz - beides fuer Gleichstaende
+    var fx = fixtureOf(p), c = consOf(p);
+    return {id: p.id, pos: p.pos, mv: p.mv, ap: p.ap, status: p.status, form: formOf(p), trend: p.day || 0,
+      fixture: fx ? fx.factor : 1, cons: c && c.n >= 5 ? c.share : null};
+  }
+
+  // ---------- Gegner der naechsten Spiele ----------
+  // Zeitraum: naechstes Spiel oder naechste 3 (gewichtet 50/30/20)
+  var horizon = 3;
+  try { horizon = +localStorage.getItem('kp_horizon') === 1 ? 1 : 3; } catch(e){}
+  var POS_NUM = {TW: 1, ABW: 2, MF: 3, ANG: 4};
+  var fixCache = {};
+  function fixtureOf(p){
+    var m = state.opp;
+    if (!m || !state.league || m.league !== state.league.i || !p.tid || !POS_NUM[p.pos]) return null;
+    if (fixCache[p.id] === undefined) fixCache[p.id] = KBData.fixturesFor(m, POS_NUM[p.pos], p.tid, horizon);
+    return fixCache[p.id];
+  }
+  function loadOpponents(){
+    var l = state.league;
+    if (!state.kbTeams.length) return;
+    state.oppLoading = true;
+    KBData.fetchOpponentModel(client, l.cpi || 1, state.kbTeams).then(function(m){
+      if (state.league !== l) return;
+      m.league = l.i;
+      state.opp = m; state.oppLoading = false; fixCache = {};
+      adviceCache = {key: null, value: null};
+      render();
+    }).catch(function(){
+      if (state.league !== l) return;
+      state.oppLoading = false;
+      render();
+    });
+  }
+  function clubAbbr(tid){
+    var n = state.clubNames[tid] || '';
+    return n.replace(/[^A-Za-zÄÖÜäöüß]/g, '').slice(0, 3).toUpperCase() || '?';
+  }
+  // "vs Kiel (A) · schwer" bzw. "vs KIE, HER, FÜR · leicht"
+  function fixtureHtml(p){
+    var fx = fixtureOf(p);
+    if (!fx || !fx.games.length) return '';
+    var g = fx.games[0];
+    var txt = horizon === 1
+      ? 'vs ' + escapeHtml(state.clubNames[g.opp] || clubAbbr(g.opp)) + ' (' + (g.home ? 'H' : 'A') + ')'
+      : 'vs ' + fx.games.map(function(x){ return escapeHtml(clubAbbr(x.opp)); }).join(', ');
+    var word = fx.factor >= 1.1 ? 'leicht' : (fx.factor <= 0.9 ? 'schwer' : '');
+    return '<span class="' + (word === 'leicht' ? 'up' : (word ? 'neg' : '')) + '">' + txt + (word ? ' · ' + word : '') + '</span>';
+  }
+  function horizonHtml(){
+    if (!state.opp || state.opp.league !== (state.league && state.league.i)){
+      return state.oppLoading ? '<p class="horizon-note">Gegner der nächsten Spiele werden geladen (beim ersten Mal etwa eine Minute) …</p>' : '';
+    }
+    return '<div class="seg sm" role="group" aria-label="Zeitraum für erwartete Punkte">' +
+      '<button type="button" data-horizon="1" class="' + (horizon === 1 ? 'on' : '') + '">Nächstes Spiel</button>' +
+      '<button type="button" data-horizon="3" class="' + (horizon === 3 ? 'on' : '') + '">Nächste 3 Spiele</button></div>';
   }
 
   function loadForms(){
@@ -1788,7 +2211,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   // Alle Spieler, die nach Plan im Kader stehen koennen: eigener Kader plus vorgemerkte Kaeufe
   function lineupPool(){
     var bought = state.market.filter(function(m){ return state.bids[m.id] != null; }).map(function(m){
-      return {id: m.id, name: m.name, pos: m.pos, mv: m.mv, ap: m.ap, status: m.status, bought: true};
+      return {id: m.id, name: m.name, pos: m.pos, mv: m.mv, ap: m.ap, status: m.status, tid: m.tid, bought: true};
     });
     return state.players.concat(bought);
   }
@@ -1951,6 +2374,8 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     list.forEach(function(p){
       var f = formOf(p), info = ['≈ ' + Math.round(expected(p)) + ' P'];
       if (f && f.recentDays) info.push(f.recentStarts + '/' + f.recentDays + ' Startelf');
+      var fxh = fixtureHtml(p);
+      if (fxh) info.push(fxh);
       info.push(placed[p.id] ? 'auf dem Feld' : (p.bought ? 'Gebot' : 'Bank'));
       html += '<div class="row"><span class="pos">' + p.pos + '</span>' +
         '<div class="main"><div class="name">' + escapeHtml(p.name) + (p.status ? '<span class="dot"></span>' : '') + '</div><div class="sub num">' + info.join(' · ') + '</div></div>' +
@@ -1987,7 +2412,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     var p = plan();
     if (p.after >= 0) return null;
     var sellable = state.players.filter(function(x){ return !state.sell[x.id]; });
-    var key = state.league.i + '|' + p.after + '|' + sellable.map(function(x){ return x.id; }).join(',') + '|' + p.bought.map(function(x){ return x.id; }).join(',') + '|' + !!state.forms;
+    var key = state.league.i + '|' + p.after + '|' + sellable.map(function(x){ return x.id; }).join(',') + '|' + p.bought.map(function(x){ return x.id; }).join(',') + '|' + !!state.forms + '|' + horizon + '|' + (state.opp ? state.opp.at : 0);
     if (adviceCache.key !== key){
       var entry = calcEntry;
       // Vorgemerkte Kaeufe kommen bei Erfolg in den Kader und zaehlen fuer die Elf mit
@@ -2017,7 +2442,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
           ' · ' + r.formation + '</div></div>' +
         '<button type="button" class="btn" data-advice="' + o[0] + '">Übernehmen</button></div>';
     });
-    return html + '<p class="advice-note">Erwartete Punkte aus Punkteschnitt, Form und Einsatzquote der letzten 5 Spieltage. Bei Gleichstand gehen fallende Marktwerte zuerst. Ausfälle mit Abschlag (angeschlagen 90 %, verletzt 40 %). Verkauf an Kickbase zum Marktwert. Spieler ohne Punkteschnitt (z. B. Neuzugänge) zählen mit 0.</p></div>';
+    return html + '<p class="advice-note">Erwartete Punkte aus Punkteschnitt, Form und Einsatzquote der letzten 5 Spieltage, angepasst an die Gegner der ' + (horizon === 1 ? 'nächsten Partie' : 'nächsten 3 Spiele') + ' (Teamstärke und wie viele Punkte der Gegner auf der Position zulässt). Bei Gleichstand gehen schwankende Spieler und fallende Marktwerte zuerst. Ausfälle mit Abschlag (angeschlagen 90 %, verletzt 40 %). Verkauf an Kickbase zum Marktwert. Spieler ohne Punkteschnitt (z. B. Neuzugänge) zählen mit 0.</p></div>';
   }
 
   function applyAdvice(kind){
@@ -2040,6 +2465,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     if (!state.players.length) return html + '<div class="empty">Keine Spieler im Kader.</div></section>';
     html += '<div class="seg" role="group" aria-label="Ansicht"><button type="button" data-kview="pitch" class="' + (kaderView === 'pitch' ? 'on' : '') + '">Aufstellung</button>' +
       '<button type="button" data-kview="list" class="' + (kaderView === 'list' ? 'on' : '') + '">Liste</button></div>';
+    html += horizonHtml();
     html += adviceHtml();
     if (kaderView === 'pitch' && state.lineup) return html + lineupHtml(compact) + '</section>';
     POS_ORDER.concat(["–"]).forEach(function(pos){
@@ -2072,6 +2498,8 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       if (state.nextKickoff && left != null && Date.now() + left * 1000 > state.nextKickoff) sub.push('nach Anpfiff');
     }
     if (p.bids) sub.push(p.bids + ' Gebot' + (p.bids > 1 ? 'e' : ''));
+    var fxm = fixtureHtml(p);
+    if (fxm) sub.push(fxm);
     if (!compact && state.clubNames[p.tid]) sub.push(escapeHtml(state.clubNames[p.tid]));
     var html = '<div class="row' + (marked ? ' on' : '') + (compact ? '' : ' np') + '">' +
       (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
@@ -2296,6 +2724,14 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       var s = state.pick.split(':');
       state.lineup.slots[s[0]][+s[1]] = null;
       state.pick = null; saveLineup(); render();
+    });
+    each('#body [data-horizon]', function(b){
+      b.addEventListener('click', function(){
+        horizon = +b.getAttribute('data-horizon') === 1 ? 1 : 3;
+        try { localStorage.setItem('kp_horizon', String(horizon)); } catch(e){}
+        fixCache = {}; adviceCache = {key: null, value: null};
+        render();
+      });
     });
     each('#body [data-kview]', function(b){
       b.addEventListener('click', function(){

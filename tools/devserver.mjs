@@ -26,6 +26,19 @@ http.createServer((req, res) => {
     });
     return;
   }
+  // Nur fuer tools/backtest.mjs: Rohdaten aus einem eingeloggten Tab nach private/
+  // (per .gitignore nie im Repo).
+  const raw = req.method === 'POST' && req.url.match(/^\/__save\/private\/([a-z0-9-]+\.json)$/);
+  if (raw) {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      fs.mkdirSync(path.join(root, 'private'), { recursive: true });
+      fs.writeFileSync(path.join(root, 'private', raw[1]), Buffer.concat(chunks));
+      res.writeHead(200); res.end('ok');
+    });
+    return;
+  }
   const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname).replace(/^\/+/, '');
   if (!rel) { res.writeHead(302, { Location: '/dist/web/' }); return res.end(); }
   let file = path.resolve(root, rel);

@@ -309,3 +309,11 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   .cols .rank-no{ display:none; }
   .sheet{ bottom:auto; top:50%; transform:translate(-50%, -50%); border-radius:16px; max-width:420px; }
 }
+
+/* Zeitraum fuer erwartete Punkte */
+.seg.sm{ margin-top:8px; }
+.seg.sm button{ min-height:30px; font-size:12.5px; }
+.horizon-note{ padding:8px 20px 0; font-size:12.5px; color:var(--mut); }
+@media (min-width: 1000px){
+  .horizon-note{ padding-left:0; padding-right:0; }
+}

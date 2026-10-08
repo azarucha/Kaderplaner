@@ -30,12 +30,39 @@ Prüfstein am 08.10.2026: 75.000.000 − 543.196.551 + 419.613.941 + 25.029.776
 | `/leagues/{L}/managers/{U}/dashboard` | `tv` echter Kaderwert, `tp` Saisonpunkte, `mdw` Spieltagssiege, `t` Zahl der Transfers inkl. Auto-Verkäufe |
 | `/leagues/{L}/managers/{U}/performance` | Spieltage mit `day`, `md` (Anstoß), `mdp` (Punkte), `tw` (Spieltagssieg) |
 | `/leagues/{L}/users/{me}/teamcenter?dayNumber=D` | Aufstellung (`lp`) und Punkte (`mdp`) **aller** Manager an Spieltag D |
-| `/competitions/{cpi}/players/{P}/performance` | Punkte eines Spielers je Spieltag (`it[].ph[].p`) |
+| `/competitions/{cpi}/players/{P}/performance` | **Ganze Karriere je Saison** (`it[].ti` z. B. „2026/2027“, auch 1. Liga). Je Spiel in `ph[]`: `day`, `p` Punkte, `mp` Minuten, `st` (5 Startelf, 3 eingewechselt, 4 nicht eingesetzt, 0 noch nicht gespielt), `t1`/`t2` Heim/Gast als Kickbase-Vereins-ID, `t1g`/`t2g` Tore, `pt` Verein des Spielers, `md` Anstoß, `mi` Spiel-ID. **Kommende Spiele stehen mit `st` 0 und ohne Tore drin.** |
+| `/competitions/{cpi}/teams/{T}/teamprofile` | Kader eines Vereins (`it[]` mit `i`, `pos`, `ap`, `mv`, `st`) |
+| `/competitions/{cpi}/table` | Tabelle: `tid`, `tn`, `cpl` Platz, `sp` Kickbase-Punkte, `gd` Tordifferenz, `mc` Spiele |
 | `/leagues/{L}/user/achievements` | eigene Erfolge mit Anzahl `ac` |
 | `/leagues/{L}/user/achievements/{t}` | Beschreibung `d` und **Prämie `er`** dieses Erfolgs in dieser Liga |
 | `/leagues/{L}/activitiesFeed` | **Nur rund ein Monat Historie.** Typ 22 eigene Auflaufprämie (`bn`), Typ 17 Spieltagssieger, Typ 26 eigene Erfolge, Typ 32 MVP-Auto-Verkauf (`slr`, `trp`) |
 
 Nicht vorhanden (404): Erfolge anderer Manager, ein Budget-Endpunkt für Gegner.
+
+## Gegnerstärke
+
+Für den Gegnerfaktor der erwarteten Punkte lädt die App einmal pro halbem Tag die
+Spielerhistorie aller Vereine ihres Wettbewerbs (`teamprofile` je Verein, dann
+`performance` je Spieler mit Punkteschnitt, einige Hundert GET-Abrufe) und
+Ergebnisse von [OpenLigaDB](https://www.openligadb.de) (`/getmatchdata/bl2/2026`, offenes
+CORS, ohne Login). Die Vereinsnamen lassen sich eindeutig zuordnen („Hertha BSC“ ↔
+„Hertha“, „SpVgg Greuther Fürth“ ↔ „Fürth“).
+
+Rückrechnung am 08.10.2026 mit 475 Spielern der 2. Liga, 4.644 Startelf-Einsätzen aus
+2025/26 und 2026/27, jeder Spieltag nur mit Daten davor vorhergesagt
+(`tools/backtest.mjs`):
+
+| Vorhersage | RMSE (Punkte) |
+|---|---|
+| Saisonschnitt des Spielers | 63,70 |
+| getrimmter Schnitt (je 10 % oben/unten weg) | 63,89 (schlechter) |
+| Schnitt × Gegnerfaktor | **63,22** (Differenz der quadrierten Fehler −61 ± 15) |
+| zum Vergleich: Gegnerwerte aus den tatsächlichen Ergebnissen (nachträglich) | 62,28 |
+
+Ein eigener Gegnereffekt je Spieler (Regression auf seine Spiele, zur Position gestaucht)
+war nicht besser als der Positionswert und ist deshalb nicht eingebaut. Kickbase-Punkte
+schwanken pro Spiel um rund ±64; die Gegner erklären davon nur einen kleinen, aber
+messbaren Teil.
 
 ## Fallen
 

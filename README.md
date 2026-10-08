@@ -28,9 +28,15 @@ mitbieten kann.
 - **Ins Plus kommen:** Steht das Konto nach Plan im Minus, schlägt die App vor, wen
   du verkaufen solltest. Sie prüft alle Kombinationen und wählt die, die genug Geld
   bringt und die wenigsten erwarteten Punkte der besten Elf kostet. Erwartete Punkte
-  = Qualität (Punkteschnitt und Form der letzten Einsätze) × Einsatzchance (letzte 5
-  Spieltage und Saison) × Verfügbarkeit; leere Plätze kosten −100. Bei Gleichstand
-  werden Spieler mit fallendem Marktwert zuerst verkauft.
+  = Qualität (Punkteschnitt und Form der letzten Einsätze) × Gegnerfaktor ×
+  Einsatzchance (letzte 5 Spieltage und Saison) × Verfügbarkeit; leere Plätze kosten
+  −100. Bei Gleichstand werden schwankende Spieler und fallende Marktwerte zuerst
+  verkauft.
+- **Gegner der nächsten Spiele:** umschaltbar zwischen nächstem Spiel und den nächsten
+  drei (gewichtet 50/30/20). Der Faktor kommt aus der Teamstärke (Ergebnisse dieser und
+  der letzten Saison) und daraus, wie viele Kickbase-Punkte ein Gegner Spielern auf
+  derselben Position zulässt. In jeder Zeile steht der Gegner, „leicht“ oder „schwer“
+  und ob ein Spieler konstant oder schwankend punktet.
 - **Kader planen:** Spieler zum Verkauf markieren, Marktspieler mit eigenem Gebot
   vormerken. Kontostand, Spielraum bis zur 33%-Grenze, Kader- und Vereinslimit
   rechnen sofort mit.
@@ -76,6 +82,27 @@ Unterwegs gefunden und dokumentiert ([docs/kickbase-api-notes.md](docs/kickbase-
   Spieltags-, Spieler- und Transferdaten exakt ableiten. Für das eigene Konto stimmt
   die Ableitung auf den Euro mit den von Kickbase gemeldeten Erfolgen überein.
 
+## Hilft der Gegner wirklich bei der Vorhersage?
+
+Ja, aber weniger, als man denkt. Rückgerechnet an 475 Spielern der 2. Liga (4.644
+Startelf-Einsätze, jeder Spieltag nur mit den Daten davor vorhergesagt, Skript
+[`tools/backtest.mjs`](tools/backtest.mjs)):
+
+| Vorhersage | mittlerer Fehler (RMSE) |
+|---|---|
+| Saisonschnitt des Spielers | 63,7 Punkte |
+| Schnitt × Gegnerfaktor | **63,2 Punkte** |
+
+Der Unterschied ist klein, aber deutlich größer als der Zufall (rund vier
+Standardfehler). Kickbase-Punkte schwanken pro Spiel enorm; selbst mit den tatsächlichen
+Ergebnissen im Nachhinein käme man nur auf 62,3. Zwei Ideen haben die Vorhersage dagegen
+**nicht** verbessert und sind deshalb nicht drin: ein getrimmter Schnitt ohne
+Ausreißerspiele und ein eigener Gegnereffekt pro Spieler. Konstanz zeigt die App an und
+nutzt sie bei Gleichstand, an den Punkten ändert sie nichts.
+
+Grenzen: Früh in der Saison und bei Aufsteigern gibt es wenige Spiele, die Werte werden
+dann zum Mittel gezogen. Pokal- und Europapokalspiele zählen nicht.
+
 ## Installation
 
 ### Als Web-App
@@ -111,9 +138,10 @@ flowchart LR
     W[Scriptable-Wrapper<br/>Keychain, Widget] --> V[App-Oberfläche<br/>WebView oder Browser]
     P[Web-App / PWA] --> V
     V --> D[data.js<br/>API-Aufrufe, Cache]
-    D --> C[calc.js<br/>33%-Regel, Prämien,<br/>Schätzung]
+    D --> C[calc.js<br/>33%-Regel, Prämien,<br/>Schätzung, Gegnermodell]
   end
   D -->|nur GET| K[(Kickbase-API)]
+  D -->|Ergebnisse| O[(OpenLigaDB)]
   W -->|Widget, nur GET| K
 ```
 
@@ -127,6 +155,7 @@ flowchart LR
 | `build.mjs` | Bündelt alles zu `dist/Kaderplaner.js` (Scriptable) und `dist/web/` (PWA) |
 | `tools/mock.js` | Simuliertes Kickbase-Backend mit erfundenen Daten für Demo und Tests |
 | `tools/widget-harness.mjs` | Führt das Widget in Node mit nachgebildeten Scriptable-APIs aus |
+| `tools/backtest.mjs` | Rückrechnung des Gegnermodells auf einem lokalen Datenexport (`tools/collect.html`) |
 
 ## Entwicklung
 
@@ -160,12 +189,19 @@ Schritt gegen den echten Kontostand geprüft, bis die Abweichung im Rauschen lag
 ## Datenschutz
 
 - Es gibt keinen eigenen Server, kein Tracking und keine Werbung. Die App ist eine
-  statische Seite, die direkt im Browser mit `api.kickbase.com` spricht.
+  statische Seite, die direkt im Browser mit `api.kickbase.com` (und für Ergebnisse
+  mit `api.openligadb.de`) spricht.
 - E-Mail und Passwort gehen beim Anmelden nur an Kickbase und werden nicht
   gespeichert. Auf dem Gerät bleibt nur der Zugangstoken (im Browser-Speicher bzw.
   in der iOS-Keychain), bis du dich abmeldest.
 - Die Schrift [Geist](https://github.com/vercel/geist-font) wird mitgeliefert
-  (SIL Open Font License), es werden keine Inhalte von Drittservern nachgeladen.
+  (SIL Open Font License), Schriften oder Skripte von Drittservern werden nicht
+  nachgeladen.
+- Für den Gegnerfaktor holt die App öffentliche Spielergebnisse von
+  [OpenLigaDB](https://www.openligadb.de) (`api.openligadb.de`, ohne Login und Cookies).
+  Dabei sieht OpenLigaDB wie jeder Server deine IP-Adresse; Kickbase-Daten oder dein
+  Token gehen nicht dorthin. Ist OpenLigaDB nicht erreichbar, rechnet die App mit den
+  Ergebnissen aus den Kickbase-Daten.
 - Die Web-Version liegt auf GitHub Pages; dort gilt das
   [GitHub Privacy Statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement).
 

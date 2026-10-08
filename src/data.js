@@ -31,10 +31,13 @@
     return Promise.all(workers).then(function(){ return results; });
   }
 
+  // Im Demo-Modus nichts speichern: Demo und echte App teilen sich im Web eine Origin.
   function cacheGet(key){
+    if (root.__KP_DEMO) return null;
     try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch(e){ return null; }
   }
   function cacheSet(key, value){
+    if (root.__KP_DEMO) return;
     try { localStorage.setItem(key, JSON.stringify(value)); } catch(e){}
   }
 
@@ -254,7 +257,12 @@
         seasons.forEach(function(s){
           if (!cur || String(s.ti) > String(cur.ti) || (s.ti === cur.ti && (s.ph || []).length > (cur.ph || []).length)) cur = s;
         });
-        return {id: id, ph: (cur && cur.ph) || []};
+        var prev = cur && seasons.filter(function(s){ return s.ti === prevSeason(cur.ti); })[0];
+        // Konstanz: Startelf-Einsaetze dieser Saison (Gewicht 1) und der letzten (0,5)
+        var starts = [];
+        if (cur) (cur.ph || []).forEach(function(h){ if (h.st === 5 && h.p != null) starts.push({p: h.p, w: 1}); });
+        if (prev) (prev.ph || []).forEach(function(h){ if (h.st === 5 && h.p != null) starts.push({p: h.p, w: 0.5}); });
+        return {id: id, ph: (cur && cur.ph) || [], cons: C.playerConsistency(starts)};
       }).catch(function(){ return {id: id, ph: null}; });
     }).then(function(list){
       var lastDay = 0;
@@ -262,10 +270,175 @@
         (x.ph || []).forEach(function(h){ if (h.day > lastDay && (h.p != null || h.mp)) lastDay = h.day; });
       });
       var out = {};
-      list.forEach(function(x){ if (x.ph) out[x.id] = C.formFromPerformance(x.ph, lastDay); });
+      list.forEach(function(x){
+        if (!x.ph) return;
+        out[x.id] = C.formFromPerformance(x.ph, lastDay);
+        out[x.id].cons = x.cons;
+      });
       return out;
     });
   }
 
-  root.KBData = { createClient: createClient, pool: pool, estimateAll: estimateAll, fetchTransfers: fetchTransfers, fetchForms: fetchForms };
+  function prevSeason(ti){
+    var m = /^(\d{4})\/(\d{4})$/.exec(ti || '');
+    return m ? (+m[1] - 1) + '/' + m[1] : null;
+  }
+
+  // ---------- Gegnermodell ----------
+  // Alle Spieler der Liga (Kickbase, Startelf-Einsaetze dieser und der letzten Saison)
+  // fuer "Gegner laesst Punkte zu", Ergebnisse fuer die Teamstaerke von OpenLigaDB
+  // (Ersatz: Ergebnisse aus den Kickbase-Spielerdaten). Zwischengespeichert, damit
+  // die gut 400 Abrufe nur etwa zweimal am Tag noetig sind.
+  var LEAGUE_TTL = 12 * 3600000;
+
+  function fetchLeagueHistory(client, cpi, teams){
+    var key = 'kp_lg_' + cpi, cached = cacheGet(key), now = Date.now();
+    // nach jedem Anpfiff (plus Spieldauer) neu laden, sonst hoechstens alle 12 Stunden
+    if (cached && cached.v === 1 && now - cached.at < LEAGUE_TTL && !(cached.nextKick && now > cached.nextKick + 2.5 * 3600000)) return Promise.resolve(cached);
+    var opt = function(p){ return p.catch(function(){ return null; }); };
+    return pool(teams, 4, function(t){ return opt(client.get("/competitions/" + cpi + "/teams/" + t.tid + "/teamprofile")); }).then(function(profiles){
+      var players = [];
+      profiles.forEach(function(pr, k){
+        ((pr && pr.it) || []).forEach(function(p){ if (p.ap > 0) players.push({id: String(p.i), pos: p.pos, tid: String(teams[k].tid)}); });
+      });
+      var matches = {}, nextByTeam = {}, curTi = null, nextKick = null;
+      return pool(players, 6, function(pl){
+        return opt(client.get("/competitions/" + cpi + "/players/" + pl.id + "/performance")).then(function(d){
+          var seasons = ((d && d.it) || []).filter(function(s){ return /^\d{4}\/\d{4}$/.test(s.ti); });
+          seasons.sort(function(a, b){ return a.ti < b.ti ? -1 : 1; });
+          var cur = seasons[seasons.length - 1];
+          if (!cur) return;
+          if (!curTi || cur.ti > curTi) curTi = cur.ti;
+          pl.ti = cur.ti;
+          var prev = seasons.filter(function(s){ return s.ti === prevSeason(cur.ti); })[0];
+          pl.g = [];
+          [[cur, 0], [prev, 1]].forEach(function(x){
+            if (!x[0]) return;
+            (x[0].ph || []).forEach(function(h){
+              var t = Date.parse(h.md);
+              if (h.t1g != null && h.t2g != null && h.mi) matches[h.mi] = [String(h.t1), String(h.t2), h.t1g, h.t2g, x[1], t];
+              if (h.st === 5 && h.p != null && h.pt){
+                var home = String(h.pt) === String(h.t1);
+                pl.g.push([h.p, String(home ? h.t2 : h.t1), home ? 1 : 0, x[1]]);
+              }
+              // kommende Spiele des Vereins (noch ohne Ergebnis)
+              if (x[1] === 0 && h.t1g == null && t > now){
+                var list = nextByTeam[pl.tid] = nextByTeam[pl.tid] || {};
+                var home2 = String(h.t1) === pl.tid;
+                list[h.mi || t] = [String(home2 ? h.t2 : h.t1), home2 ? 1 : 0, t];
+                if (!nextKick || t < nextKick) nextKick = t;
+              }
+            });
+          });
+        });
+      }).then(function(){
+        var next = {};
+        Object.keys(nextByTeam).forEach(function(tid){
+          next[tid] = Object.keys(nextByTeam[tid]).map(function(k){ return nextByTeam[tid][k]; }).sort(function(a, b){ return a[2] - b[2]; }).slice(0, 4);
+        });
+        var data = {v: 1, at: now, ti: curTi, nextKick: nextKick, next: next,
+          players: players.filter(function(p){ return p.g && p.ti === curTi; }).map(function(p){ return [p.id, p.pos, p.tid, p.g]; }),
+          matches: Object.keys(matches).map(function(k){ return matches[k]; })};
+        if (data.players.length) cacheSet(key, data);
+        return data;
+      });
+    });
+  }
+
+  // OpenLigaDB: oeffentliche Ergebnisse, ohne Login oder Cookies. Laufende Saison
+  // 6 Stunden zwischengespeichert, abgeschlossene Saisons dauerhaft.
+  var OPENLIGA = "https://api.openligadb.de";
+  function fetchOpenLiga(shortcut, year, current){
+    var key = 'kp_ol_' + shortcut + '_' + year, cached = cacheGet(key);
+    if (cached && (!current || Date.now() - cached.at < 6 * 3600000)) return Promise.resolve(cached);
+    return fetch(OPENLIGA + "/getmatchdata/" + shortcut + "/" + year).then(function(r){ return r.ok ? r.json() : []; }).then(function(list){
+      var teams = {}, matches = [];
+      (list || []).forEach(function(m){
+        if (!m.team1 || !m.team2) return;
+        [m.team1, m.team2].forEach(function(t){ teams[t.teamId] = [t.teamName, t.shortName]; });
+        var end = (m.matchResults || []).filter(function(r){ return r.resultTypeID === 2; })[0];
+        matches.push([String(m.team1.teamId), String(m.team2.teamId), m.matchIsFinished && end ? end.pointsTeam1 : null, m.matchIsFinished && end ? end.pointsTeam2 : null, Date.parse(m.matchDateTimeUTC)]);
+      });
+      var data = {at: Date.now(), teams: teams, matches: matches};
+      if (matches.length) cacheSet(key, data);
+      return data;
+    }).catch(function(){ return null; });
+  }
+
+  // Vereinsnamen von OpenLigaDB auf Kickbase-IDs abbilden ("Hertha BSC" = "Hertha",
+  // "SpVgg Greuther Fürth" = "Fürth"). Nicht zuordenbare Vereine behalten eine eigene Kennung.
+  function normName(s){
+    return String(s || '').toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+      .replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(function(w){ return w && !/^(fc|sv|vfl|vfb|sc|spvgg|dsc|bsc|tsg|fsv|ssv|sg|1|04|05|96|98|1846|1860|1899|1900|1907|1909)$/.test(w); }).join(' ');
+  }
+  function mapTeams(olTeams, kbTeams){
+    var map = {}, used = {};
+    var kb = kbTeams.map(function(t){ return {tid: String(t.tid), n: normName(t.tn)}; });
+    Object.keys(olTeams).forEach(function(id){
+      var full = normName(olTeams[id][0]), short = normName(olTeams[id][1]);
+      var hit = kb.filter(function(t){ return !used[t.tid] && (t.n === short || t.n === full); })[0] ||
+        kb.filter(function(t){ return !used[t.tid] && t.n && (full.indexOf(t.n) >= 0 || t.n.indexOf(short) >= 0); })[0];
+      if (hit){ map[id] = hit.tid; used[hit.tid] = true; } else map[id] = 'ol' + id;
+    });
+    return map;
+  }
+
+  // Setzt alles zusammen: Teamstaerke, Gegnerwerte je Position, Steigung je Position.
+  // kbTeams: Tabelle der Kickbase-Wettbewerbs (tid, tn).
+  function fetchOpponentModel(client, cpi, kbTeams){
+    return fetchLeagueHistory(client, cpi, kbTeams).then(function(lg){
+      var m = /^(\d{4})\//.exec(lg.ti || ''), year = m ? +m[1] : null;
+      var shortcut = String(cpi) === '1' ? 'bl1' : (String(cpi) === '2' ? 'bl2' : null);
+      var ol = year && shortcut ? Promise.all([
+        fetchOpenLiga(shortcut, year, true), fetchOpenLiga('bl1', year - 1, false), fetchOpenLiga('bl2', year - 1, false)
+      ]) : Promise.resolve([]);
+      return ol.then(function(parts){ return buildOpponentModel(lg, parts, kbTeams); });
+    });
+  }
+
+  function buildOpponentModel(lg, olParts, kbTeams){
+    var P = C.OPP, matches = [], source = 'kickbase';
+    // Ergebnisse von OpenLigaDB, wenn die laufende Saison zuordenbar ist
+    var cur = olParts && olParts[0];
+    if (cur && cur.matches.length){
+      var all = [];
+      olParts.forEach(function(part, i){
+        if (!part) return;
+        var map = mapTeams(part.teams, kbTeams);
+        part.matches.forEach(function(x){ if (x[2] != null) all.push({home: map[x[0]], away: map[x[1]], hg: x[2], ag: x[3], w: i === 0 ? 1 : P.prevSeason, cur: i === 0}); });
+      });
+      var mapped = all.filter(function(x){ return x.cur && x.home.indexOf('ol') !== 0 && x.away.indexOf('ol') !== 0; }).length;
+      if (mapped >= 9){ matches = all; source = 'openligadb'; }
+    }
+    if (!matches.length) matches = lg.matches.map(function(x){ return {home: x[0], away: x[1], hg: x[2], ag: x[3], w: x[4] ? P.prevSeason : 1}; });
+    var ratings = C.teamRatings(matches);
+
+    var players = lg.players.map(function(x){
+      return {id: x[0], pos: x[1], tid: x[2], games: x[3].map(function(g){ return {p: g[0], opp: g[1], home: !!g[2], prev: !!g[3]}; })};
+    });
+    var allow = C.opponentAllowance(players);
+    var slopes = {};
+    [1, 2, 3, 4].forEach(function(pos){
+      var entries = players.filter(function(pl){ return pl.pos === pos; }).map(function(pl){
+        var W = 0, S = 0;
+        var games = pl.games.map(function(g){ var w = g.prev ? 0.5 : 1; W += w; S += w * g.p; return {p: g.p, w: w, x: C.matchEdge(ratings, g.opp, g.home)}; });
+        return {quality: W ? S / W : null, games: games};
+      });
+      slopes[pos] = C.positionSlope(entries, P.slope[pos]);
+    });
+    return {ratings: ratings, allow: allow, slopes: slopes, next: lg.next, source: source, at: lg.at, players: players.length};
+  }
+
+  // Gegner und Faktor der naechsten Spiele fuer einen Spieler (pos 1-4, tid Verein).
+  function fixturesFor(model, pos, tid, horizon){
+    var list = ((model && model.next[String(tid)]) || []).filter(function(x){ return x[2] > Date.now() - 2 * 3600000; }).slice(0, 3);
+    var games = list.map(function(x){
+      var edge = C.matchEdge(model.ratings, x[0], !!x[1]);
+      return {opp: x[0], home: !!x[1], at: x[2], f: C.matchFactor(model.allow[x[0] + '|' + pos], model.slopes[pos], edge)};
+    });
+    return {games: games, factor: C.horizonFactor(games.map(function(g){ return g.f; }), horizon)};
+  }
+
+  root.KBData = { createClient: createClient, pool: pool, estimateAll: estimateAll, fetchTransfers: fetchTransfers, fetchForms: fetchForms,
+    fetchOpponentModel: fetchOpponentModel, buildOpponentModel: buildOpponentModel, fixturesFor: fixturesFor, mapTeams: mapTeams, normName: normName };
 })(typeof self !== 'undefined' ? self : this);

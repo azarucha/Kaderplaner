@@ -233,15 +233,148 @@
   //   Einsatzchance = 60 % letzte 5 Spieltage + 40 % ganze Saison
   //   Qualitaet     = je halb Saisonschnitt pro Einsatz (ap) und Schnitt der letzten Einsaetze
   // und multipliziert mit der Verfuegbarkeit. Ohne Leistungsdaten: ap x Verfuegbarkeit.
+  // Optional: p.fixture ist der Gegnerfaktor der naechsten Spiele (Standard 1), er
+  // wirkt nur auf die Qualitaet, nicht auf Einsatzchance und Verfuegbarkeit.
   function expectedPoints(p){
     var avail = availability(p.status), f = p.form;
-    if (!f || !f.teamDays || f.teamDays < 2) return (p.ap || 0) * avail;
+    var ap = p.ap;
+    var fix = p.fixture != null ? p.fixture : 1;
+    if (!f || !f.teamDays || f.teamDays < 2) return (ap || 0) * fix * avail;
     var chance = 0.6 * (f.recentApps / Math.max(1, f.recentDays)) + 0.4 * (f.apps / f.teamDays);
     var recentQ = f.recentApps ? f.recentPoints / f.recentApps : null;
-    var quality = p.ap != null
-      ? (recentQ != null ? 0.5 * p.ap + 0.5 * recentQ : p.ap)
+    var quality = ap != null
+      ? (recentQ != null ? 0.5 * ap + 0.5 * recentQ : ap)
       : (recentQ != null ? recentQ : 0);
-    return quality * chance * avail;
+    return quality * fix * chance * avail;
+  }
+
+  // ---------- Gegnerstaerke ----------
+  // Gemessen an 475 Spielern der 2. Liga (4.644 Startelf-Einsaetze, jeder Spieltag nur
+  // mit den Daten davor vorhergesagt): Ein Gegnerfaktor aus "Gegner laesst auf dieser
+  // Position viele Punkte zu" und der Teamstaerke senkt den Fehler messbar; ein
+  // eigener Gegnereffekt je Spieler oder ein getrimmter Schnitt verbessern nichts.
+  var OPP = {
+    lambda: 8,          // Teamstaerke: Zug zum Mittel (in Spielen)
+    prevSeason: 0.35,   // Gewicht der letzten Saison fuer Teamstaerke und Gegnerwerte
+    allowK: 100,        // Gegnerwert: Zug zu 0 (in Einsaetzen)
+    allowWeight: 0.7,
+    edgeWeight: 0.5,
+    // Startwerte je Position (1 TW, 2 ABW, 3 MF, 4 ANG): relative Punktaenderung pro Tor
+    // erwarteter Tordifferenz, live aus allen Spielern nachgeschaetzt
+    slope: {1: 0.13, 2: 0.38, 3: 0.43, 4: 0.7}
+  };
+
+  // matches: [{home, away, hg, ag, w}]. Modell: erwartete Tordifferenz =
+  // r[home] - r[away] + H, Ridge-Regression mit Zug zum Mittel, Tordifferenz auf +-3 gekappt.
+  function teamRatings(matches, opts){
+    opts = opts || {};
+    var lambda = opts.lambda != null ? opts.lambda : OPP.lambda, cap = opts.cap || 3;
+    var r = {}, games = {};
+    var list = (matches || []).filter(function(m){ return m.hg != null && m.ag != null && (m.w == null || m.w > 0); });
+    list.forEach(function(m){
+      [m.home, m.away].forEach(function(t){ if (r[t] == null){ r[t] = 0; games[t] = []; } });
+      games[m.home].push(m); games[m.away].push(m);
+    });
+    var gd = function(m){ return Math.max(-cap, Math.min(cap, m.hg - m.ag)); };
+    var wt = function(m){ return m.w == null ? 1 : m.w; };
+    var H = 0, teams = Object.keys(r);
+    for (var it = 0; it < 40; it++){
+      var hs = 0, hw = 0;
+      list.forEach(function(m){ hs += wt(m) * (gd(m) - r[m.home] + r[m.away]); hw += wt(m); });
+      H = hw ? hs / (hw + lambda) : 0;
+      teams.forEach(function(t){
+        var s = 0, wsum = lambda;
+        games[t].forEach(function(m){
+          s += m.home === t ? wt(m) * (gd(m) - H + r[m.away]) : wt(m) * (r[m.home] + H - gd(m));
+          wsum += wt(m);
+        });
+        r[t] = s / wsum;
+      });
+    }
+    return {r: r, home: H};
+  }
+
+  // Spielschwierigkeit aus Sicht eines Spielers, positiv = leichter. Die eigene
+  // Teamstaerke steckt schon im Punkteschnitt, deshalb zaehlen Gegner und Heimvorteil.
+  function matchEdge(ratings, opp, home){
+    if (!ratings || ratings.r[opp] == null) return null;
+    return (home ? ratings.home : -ratings.home) / 2 - ratings.r[opp];
+  }
+
+  // Wie viele Punkte laesst ein Gegner je Position zu? players: [{pos, games:
+  // [{p, opp, prev}]}] (nur Startelf). Je Einsatz: Punkte relativ zum Saisonschnitt
+  // des Spielers ohne dieses Spiel, gemittelt je Gegner und Position, zu 0 gezogen.
+  function opponentAllowance(players, opts){
+    opts = opts || {};
+    var k = opts.k != null ? opts.k : OPP.allowK, sums = {};
+    (players || []).forEach(function(pl){
+      var seasons = {};
+      (pl.games || []).forEach(function(g){ var b = seasons[g.prev ? 1 : 0] = seasons[g.prev ? 1 : 0] || {s: 0, n: 0}; b.s += g.p; b.n++; });
+      (pl.games || []).forEach(function(g){
+        var b = seasons[g.prev ? 1 : 0];
+        if (b.n < 4) return;
+        var ref = (b.s - g.p) / (b.n - 1);
+        if (ref < 20) return;
+        var w = g.prev ? OPP.prevSeason : 1, key = g.opp + '|' + pl.pos;
+        var a = sums[key] = sums[key] || {s: 0, w: 0};
+        a.s += w * Math.max(-1.5, Math.min(2.5, g.p / ref - 1)); a.w += w;
+      });
+    });
+    // Punkte/Schnitt ist im Mittel leicht positiv (Ausreisser nach oben): je Position
+    // auf 0 zentrieren, damit ein durchschnittlicher Gegner den Faktor 1 ergibt.
+    var out = {}, mean = {};
+    Object.keys(sums).forEach(function(key){
+      out[key] = sums[key].s / (sums[key].w + k);
+      var pos = key.split('|')[1], m = mean[pos] = mean[pos] || {s: 0, n: 0};
+      m.s += out[key]; m.n++;
+    });
+    Object.keys(out).forEach(function(key){ var m = mean[key.split('|')[1]]; out[key] -= m.s / m.n; });
+    return out;
+  }
+
+  // Gepoolte Punktaenderung je Tor Spielschwierigkeit fuer eine Position.
+  // entries: [{quality, games: [{p, x, w}]}]; zu `base` gezogen.
+  function positionSlope(entries, base, opts){
+    var k = opts && opts.k != null ? opts.k : 4, pts = [];
+    (entries || []).forEach(function(e){
+      if (!(e.quality >= 20)) return;
+      (e.games || []).forEach(function(g){ if (g.x != null && g.p != null) pts.push({x: g.x, y: g.p / e.quality - 1, w: g.w == null ? 1 : g.w}); });
+    });
+    if (pts.length < 10) return base;
+    var W = pts.reduce(function(s, g){ return s + g.w; }, 0);
+    var mx = pts.reduce(function(s, g){ return s + g.w * g.x; }, 0) / W;
+    var my = pts.reduce(function(s, g){ return s + g.w * g.y; }, 0) / W;
+    var sxx = 0, sxy = 0;
+    pts.forEach(function(g){ sxx += g.w * (g.x - mx) * (g.x - mx); sxy += g.w * (g.x - mx) * (g.y - my); });
+    return sxx < 1e-6 ? base : (sxy + k * base) / (sxx + k);
+  }
+
+  // Faktor fuer ein Spiel: 1 + 0,7 x Gegnerwert + 0,5 x Steigung x Schwierigkeit, 0,6..1,4.
+  function matchFactor(allow, slope, edge){
+    var f = 1 + OPP.allowWeight * (allow || 0) + (edge != null ? OPP.edgeWeight * (slope || 0) * edge : 0);
+    return Math.max(0.6, Math.min(1.4, f));
+  }
+
+  // Naechste Spiele gewichtet 50/30/20 (bei weniger Spielen neu normiert).
+  var HORIZON_WEIGHTS = [0.5, 0.3, 0.2];
+  function horizonFactor(factors, horizon){
+    var n = Math.min(horizon || 1, factors.length, HORIZON_WEIGHTS.length), s = 0, w = 0;
+    for (var i = 0; i < n; i++){ if (factors[i] == null) continue; s += HORIZON_WEIGHTS[i] * factors[i]; w += HORIZON_WEIGHTS[i]; }
+    return w ? s / w : 1;
+  }
+
+  // Konstanz aus Startelf-Einsaetzen [{p, w}]: share = Anteil der Spiele mit mindestens
+  // der Haelfte des eigenen Schnitts; label ab 5 Spielen. Aendert die Punkte nicht, dient
+  // als Anzeige und bei Gleichstand in der Verkaufsempfehlung.
+  function playerConsistency(games){
+    var items = (games || []).filter(function(g){ return g && g.p != null; });
+    var wsum = items.reduce(function(s, g){ return s + (g.w == null ? 1 : g.w); }, 0);
+    if (!items.length || !wsum) return {n: 0, mean: null, share: null, label: null};
+    var mean = items.reduce(function(s, g){ return s + g.p * (g.w == null ? 1 : g.w); }, 0) / wsum;
+    var ref = Math.max(mean, 1);
+    var share = items.reduce(function(s, g){ return s + (g.p >= 0.5 * ref ? (g.w == null ? 1 : g.w) : 0); }, 0) / wsum;
+    var label = items.length < 5 ? null : (share >= 0.75 ? 'konstant' : (share < 0.5 ? 'schwankend' : null));
+    return {n: items.length, mean: mean, share: share, label: label};
   }
 
   // Leistungsdaten aus /competitions/{cpi}/players/{id}/performance (Liste ph der
@@ -310,7 +443,8 @@
     opts = opts || {};
     var maxN = opts.maxN || 20;
     // trend: Marktwertaenderung in Euro pro Tag (fallend = negativ)
-    var toEntry = function(p){ return {id: p.id, pos: p.pos, mv: p.mv || 0, pts: expectedPoints(p), trend: p.trend || 0}; };
+    // cons: Konstanz (Anteil guter Spiele, siehe playerConsistency), bei Gleichstand lieber schwankende verkaufen
+    var toEntry = function(p){ return {id: p.id, pos: p.pos, mv: p.mv || 0, pts: expectedPoints(p), trend: p.trend || 0, cons: p.cons != null ? p.cons : 0.6}; };
     var sellable = players.map(toEntry);
     // opts.fixed: Spieler, die sicher dazukommen (z. B. vorgemerkte Kaeufe) - zaehlen fuer die Elf, sind aber nicht verkaufbar
     var all = sellable.concat((opts.fixed || []).map(toEntry));
@@ -330,13 +464,14 @@
         .sort(function(a, b){ return b.pts - a.pts; });
     });
     var counts = FORMATIONS.map(formationCounts);
-    var money = new Float64Array(size), trend = new Float64Array(size), best = null, fewest = null;
+    var money = new Float64Array(size), trend = new Float64Array(size), cons = new Float64Array(size), best = null, fewest = null;
     var top = {TW: [0, 0, 0, 0, 0, 0, 0], ABW: [0, 0, 0, 0, 0, 0, 0], MF: [0, 0, 0, 0, 0, 0, 0], ANG: [0, 0, 0, 0, 0, 0, 0]};
 
     for (var mask = 1; mask < size; mask++){
       var low = mask & -mask, bit = 31 - Math.clz32(low);
       money[mask] = money[mask ^ low] + cand[bit].mv;
       trend[mask] = trend[mask ^ low] + cand[bit].trend;
+      cons[mask] = cons[mask ^ low] + cand[bit].cons;
       if (money[mask] < need) continue;
 
       // Praefixsummen der besten verbleibenden Spieler je Position (bis 6 Plaetze)
@@ -357,11 +492,12 @@
       }
       var cnt = 0;
       for (var m = mask; m; m &= m - 1) cnt++;
-      // Punkte auf ganze Punkte gerundet; bei Gleichstand lieber fallende als steigende
-      // Marktwerte verkaufen, dann weniger Verkaeufe, dann mehr Geld.
-      var cand1 = {mask: mask, money: money[mask], points: pts, rp: Math.round(pts), trend: trend[mask], count: cnt, formation: form};
-      if (!best || better(cand1, best, ['rp', 'trend', 'count', 'money'])) best = cand1;
-      if (!fewest || better(cand1, fewest, ['count', 'rp', 'trend', 'money'])) fewest = cand1;
+      // Punkte auf ganze Punkte gerundet; bei Gleichstand lieber schwankende als konstante
+      // Spieler verkaufen, dann fallende statt steigende Marktwerte, dann weniger
+      // Verkaeufe, dann mehr Geld.
+      var cand1 = {mask: mask, money: money[mask], points: pts, rp: Math.round(pts), cons: Math.round(cons[mask] / cnt * 100) / 100, trend: trend[mask], count: cnt, formation: form};
+      if (!best || better(cand1, best, ['rp', 'cons', 'trend', 'count', 'money'])) best = cand1;
+      if (!fewest || better(cand1, fewest, ['count', 'rp', 'cons', 'trend', 'money'])) fewest = cand1;
     }
 
     function describe(r){
@@ -380,6 +516,14 @@
     availability: availability,
     expectedPoints: expectedPoints,
     formFromPerformance: formFromPerformance,
+    OPP: OPP,
+    teamRatings: teamRatings,
+    matchEdge: matchEdge,
+    opponentAllowance: opponentAllowance,
+    positionSlope: positionSlope,
+    matchFactor: matchFactor,
+    horizonFactor: horizonFactor,
+    playerConsistency: playerConsistency,
     bestEleven: bestEleven,
     recommendSales: recommendSales,
     MINUS_RATE: MINUS_RATE,

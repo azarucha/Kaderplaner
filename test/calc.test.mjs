@@ -191,3 +191,71 @@ test('Gegner: Schaetzungen liegen ueber dem 33%-Minimum', () => {
     assert.ok(est.low <= est.mid && est.mid <= est.high);
   }
 });
+
+// ---------- Gegnerstaerke und Konstanz ----------
+test('Teamstaerke: Reihenfolge aus Ergebnissen, Heimvorteil positiv', () => {
+  const m = [];
+  // A schlaegt alle, C verliert alles; Heimteams treffen jeweils ein Tor mehr
+  for (let r = 0; r < 6; r++){
+    m.push({ home: 'A', away: 'B', hg: 3, ag: 1 }, { home: 'B', away: 'A', hg: 1, ag: 1 });
+    m.push({ home: 'A', away: 'C', hg: 4, ag: 0 }, { home: 'C', away: 'A', hg: 0, ag: 2 });
+    m.push({ home: 'B', away: 'C', hg: 2, ag: 0 }, { home: 'C', away: 'B', hg: 1, ag: 1 });
+  }
+  const R = C.teamRatings(m, { lambda: 1 });
+  assert.ok(R.r.A > R.r.B && R.r.B > R.r.C, JSON.stringify(R.r));
+  assert.ok(R.home > 0.3, String(R.home));
+  // Spiel gegen A ist schwerer als gegen C, daheim leichter als auswaerts
+  assert.ok(C.matchEdge(R, 'A', true) < C.matchEdge(R, 'C', true));
+  assert.ok(C.matchEdge(R, 'B', true) > C.matchEdge(R, 'B', false));
+  // ohne Daten bleibt alles beim Mittel
+  assert.equal(C.matchEdge(R, 'X', true), null);
+});
+
+test('Gegnerwerte: wer viele Punkte zulaesst, liegt ueber 0, Mittel je Position 0', () => {
+  // vier Stuermer mit Schnitt 100; gegen "weich" doppelt so viele Punkte, gegen "hart" die Haelfte
+  const players = [1, 2, 3, 4].map(() => ({ pos: 4, games: [
+    { p: 100, opp: 'x' }, { p: 100, opp: 'y' }, { p: 200, opp: 'weich' }, { p: 50, opp: 'hart' }, { p: 100, opp: 'z' }
+  ] }));
+  const a = C.opponentAllowance(players, { k: 2 });
+  assert.ok(a['weich|4'] > 0.2 && a['hart|4'] < -0.2, JSON.stringify(a));
+  const vals = Object.keys(a).map(k => a[k]);
+  assert.ok(Math.abs(vals.reduce((s, v) => s + v, 0) / vals.length) < 1e-9);
+});
+
+test('Gegnerfaktor: begrenzt auf 0,6 bis 1,4, naechste 3 Spiele 50/30/20', () => {
+  assert.equal(C.matchFactor(0, 0.4, 0), 1);
+  assert.equal(C.matchFactor(5, 1, 3), 1.4);
+  assert.equal(C.matchFactor(-5, 1, -3), 0.6);
+  assert.ok(Math.abs(C.horizonFactor([1.2, 1.0, 0.8], 3) - (0.6 + 0.3 + 0.16)) < 1e-9);
+  assert.equal(C.horizonFactor([1.2, 1.0, 0.8], 1), 1.2);
+  // nur zwei Spiele bekannt: 50/30 neu normiert
+  assert.ok(Math.abs(C.horizonFactor([1.2, 0.8], 3) - (0.5 * 1.2 + 0.3 * 0.8) / 0.8) < 1e-9);
+  assert.equal(C.horizonFactor([], 3), 1);
+  // Der Faktor wirkt auf die Qualitaet, nicht auf die Einsatzchance
+  assert.equal(C.expectedPoints({ ap: 100, fixture: 0.8 }), 80);
+});
+
+test('Konstanz: konstant, schwankend und zu wenige Spiele', () => {
+  const k = C.playerConsistency([100, 90, 110, 95, 105, 100].map(p => ({ p })));
+  assert.equal(k.label, 'konstant');
+  const s = C.playerConsistency([300, 10, 20, 250, 15, 5].map(p => ({ p })));
+  assert.equal(s.label, 'schwankend');
+  assert.equal(C.playerConsistency([100, 100].map(p => ({ p }))).label, null);
+});
+
+test('Verkaufsempfehlung: schwerer Gegner und Konstanz entscheiden bei sonst gleichen Spielern', () => {
+  const base = [
+    { id: 'tw', pos: 'TW', mv: 1e6, ap: 100 },
+    { id: 'a1', pos: 'ABW', mv: 1e6, ap: 100 }, { id: 'a2', pos: 'ABW', mv: 1e6, ap: 100 },
+    { id: 'a3', pos: 'ABW', mv: 1e6, ap: 100 },
+    { id: 'm1', pos: 'MF', mv: 1e6, ap: 100 }, { id: 'm2', pos: 'MF', mv: 1e6, ap: 100 },
+    { id: 'm3', pos: 'MF', mv: 1e6, ap: 100 }, { id: 'm4', pos: 'MF', mv: 1e6, ap: 100 },
+    { id: 's1', pos: 'ANG', mv: 1e6, ap: 100 }, { id: 's2', pos: 'ANG', mv: 1e6, ap: 100 },
+    { id: 's3', pos: 'ANG', mv: 1e6, ap: 100 }
+  ];
+  const extra = [{ id: 'leicht', pos: 'ANG', mv: 5e6, ap: 100, fixture: 1.2 }, { id: 'schwer', pos: 'ANG', mv: 5e6, ap: 100, fixture: 0.8 }];
+  const r = C.recommendSales(base.concat(extra), 4e6);
+  assert.deepEqual(r.points.ids, ['schwer']);
+  const cons = [{ id: 'fest', pos: 'ANG', mv: 5e6, ap: 50, cons: 0.9 }, { id: 'wackel', pos: 'ANG', mv: 5e6, ap: 50, cons: 0.3 }];
+  assert.deepEqual(C.recommendSales(base.concat(cons), 4e6).points.ids, ['wackel']);
+});

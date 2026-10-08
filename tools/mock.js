@@ -70,6 +70,24 @@
     return {pi: p.i, pn: p.n, pos: p.pos, tid: p.tid, mv: p.mv, ap: p.ap, st: p.st, prc: p.prc};
   }
 
+  // Spielplan (Rundenturnier, Kreismethode): Spieltage 1-6 gespielt, 7-9 kommen noch
+  var strength = {}; clubs.forEach(function(c){ strength[c.tid] = rnd() * 2 - 1; });
+  var schedule = [], ids = clubs.map(function(c){ return c.tid; });
+  function fixDate(d){ return d <= 6 ? NOW - (7 - d) * 7 * DAY : NOW + ((d - 7) * 7 + 2) * DAY + 3600000; }
+  for (var day = 1; day <= 9; day++){
+    for (var g = 0; g < 9; g++){
+      var a = ids[g], b = ids[17 - g], home = day % 2 ? a : b, away = home === a ? b : a;
+      var mt = {mi: String(day * 100 + g), day: day, md: new Date(fixDate(day)).toISOString(), t1: home, t2: away};
+      if (day <= 6){
+        mt.t1g = Math.max(0, Math.round(1.4 + 0.6 * (strength[home] - strength[away]) + rnd() * 2 - 1));
+        mt.t2g = Math.max(0, Math.round(1.1 + 0.6 * (strength[away] - strength[home]) + rnd() * 2 - 1));
+      }
+      schedule.push(mt);
+    }
+    ids.splice(1, 0, ids.pop());   // alle ausser dem ersten rotieren
+  }
+  function matchOf(tid, day){ return schedule.filter(function(m){ return m.day === day && (m.t1 === tid || m.t2 === tid); })[0]; }
+
   var routes = [
     [/^\/leagues\/selection$/, function(){ return {it: [{i: LID, n: "Demo-Liga", cpi: "2", un: managers.length}]}; }],
     [/^\/leagues\/\d+\/me$/, function(){
@@ -97,15 +115,32 @@
     [/^\/competitions\/\d+\/players\/(\d+)\/performance$/, function(m){
       // wie die echte API: Startelf st 5, eingewechselt st 3, ohne Einsatz "0'"
       var p = byId[m[1]] || {pts: {}}; var ph = [];
-      for (var d = 1; d <= 6; d++){
+      for (var d = 1; d <= 9; d++){
+        var mt = matchOf(p.tid, d) || {}, base = {day: d, mi: mt.mi, md: mt.md, t1: mt.t1, t2: mt.t2, t1g: mt.t1g, t2g: mt.t2g, pt: p.tid};
+        if (d > 6){ ph.push(Object.assign(base, {st: 0, t1g: undefined, t2g: undefined})); continue; }
         var pt = p.pts[d] || 0, sub = pt > 0 && pt < 40;
-        ph.push(pt > 0 ? {day: d, p: pt, mp: sub ? "25'" : "90'", st: sub ? 3 : 5} : {day: d, p: 0, mp: "0'"});
+        ph.push(Object.assign(base, pt > 0 ? {p: pt, mp: sub ? "25'" : "90'", st: sub ? 3 : 5} : {p: 0, mp: "0'", st: 4}));
       }
-      return {it: [{ti: "2026/2027", ph: ph}]}; }]
+      return {it: [{ti: "2026/2027", ph: ph}]}; }],
+    [/^\/competitions\/\d+\/teams\/(\d+)\/teamprofile$/, function(m){
+      return {tid: m[1], it: players.filter(function(p){ return p.tid === m[1]; }).map(function(p){ return {i: p.i, n: p.n, pos: p.pos, ap: p.ap, st: p.st, tid: p.tid}; })}; }]
   ];
 
   var realFetch = window.fetch;
+  // OpenLigaDB nachgebildet: dieselben erfundenen Vereine und Ergebnisse
+  function openLiga(url){
+    var mm = /getmatchdata\/(bl\d)\/(\d{4})$/.exec(url), list = [];
+    var team = function(tid){ var c = clubs.filter(function(x){ return x.tid === tid; })[0]; return {teamId: +tid, teamName: c.tn, shortName: c.tn}; };
+    if (mm && mm[1] === "bl2" && +mm[2] === new Date(NOW).getFullYear() - (new Date(NOW).getMonth() < 6 ? 1 : 0)){
+      list = schedule.map(function(x){
+        return {matchDateTimeUTC: x.md, team1: team(x.t1), team2: team(x.t2), matchIsFinished: x.t1g != null,
+          matchResults: x.t1g != null ? [{resultTypeID: 2, pointsTeam1: x.t1g, pointsTeam2: x.t2g}] : []};
+      });
+    }
+    return Promise.resolve(new Response(JSON.stringify(list), {status: 200, headers: {"Content-Type": "application/json"}}));
+  }
   window.fetch = function(url, opts){
+    if (String(url).indexOf("https://api.openligadb.de/") === 0) return openLiga(String(url));
     if (String(url).indexOf("https://api.kickbase.com/v4") !== 0) return realFetch.apply(this, arguments);
     var u = new URL(url), path = u.pathname.replace(/^\/v4/, "");
     for (var r = 0; r < routes.length; r++){

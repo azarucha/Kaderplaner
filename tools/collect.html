@@ -1,0 +1,50 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Kaderplaner: Rohdaten sammeln</title>
+<script>
+// Nur lokal fuer den Backtest (tools/backtest.mjs). Wird aus einem eingeloggten
+// play.kickbase.com-Tab als iframe geladen und bekommt den Token per postMessage.
+// Liest nur (GET) und schreibt das Ergebnis nach private/ (nie ins Repo).
+var API = 'https://api.kickbase.com/v4';
+addEventListener('message', function(ev){
+  if (ev.origin !== 'https://play.kickbase.com' || !ev.data || !ev.data.kpToken) return;
+  var token = ev.data.kpToken, cpi = ev.data.cpi || 2, out = ev.data.out || 'kb-players.json';
+  var say = function(msg){ parent.postMessage({kpStatus: msg}, ev.origin); };
+  var get = function(p){
+    return fetch(API + p, {headers: {Authorization: 'Bearer ' + token, Accept: 'application/json'}})
+      .then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; });
+  };
+  var pool = function(items, n, fn){
+    var i = 0, res = new Array(items.length);
+    var next = function(){ if (i >= items.length) return Promise.resolve(); var k = i++; return fn(items[k]).then(function(v){ res[k] = v; return next(); }); };
+    var runners = []; for (var j = 0; j < n; j++) runners.push(next());
+    return Promise.all(runners).then(function(){ return res; });
+  };
+  get('/competitions/' + cpi + '/table').then(function(table){
+    var teams = (table && table.it) || [];
+    say('Teams: ' + teams.length);
+    return pool(teams, 4, function(t){ return get('/competitions/' + cpi + '/teams/' + t.tid + '/teamprofile'); }).then(function(profiles){
+      var players = [];
+      profiles.forEach(function(pr, k){
+        ((pr && pr.it) || []).forEach(function(p){ players.push({id: String(p.i || p.pi), pos: p.pos, tid: teams[k].tid, n: p.n || p.pn, st: p.st, ap: p.ap}); });
+      });
+      say('Spieler: ' + players.length);
+      var done = 0;
+      return pool(players, 6, function(p){
+        return get('/competitions/' + cpi + '/players/' + p.id + '/performance').then(function(d){
+          done++; if (done % 50 === 0) say('Historie ' + done + '/' + players.length);
+          // nur die letzten drei Saisons, ohne Bildpfade
+          var seasons = ((d && d.it) || []).slice(-3).map(function(s){
+            return {ti: s.ti, ph: (s.ph || []).map(function(h){ return [h.day, h.p == null ? null : h.p, h.st, h.mp || null, h.t1, h.t2, h.t1g == null ? null : h.t1g, h.t2g == null ? null : h.t2g, h.pt, h.md, h.ap == null ? null : h.ap]; })};
+          });
+          p.seasons = seasons;
+        });
+      }).then(function(){
+        var body = JSON.stringify({cpi: cpi, at: new Date().toISOString(), teams: teams.map(function(t){ return {tid: t.tid, tn: t.tn, cpl: t.cpl, sp: t.sp, gd: t.gd, mc: t.mc}; }), players: players});
+        return fetch('/__save/private/' + out, {method: 'POST', body: body}).then(function(r){ say('gespeichert ' + r.status + ' ' + Math.round(body.length / 1024) + ' KB'); });
+      });
+    });
+  }).catch(function(e){ say('Fehler ' + e.message); });
+});
+parent.postMessage({kpStatus: 'bereit'}, '*');
+</script>

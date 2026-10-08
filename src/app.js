@@ -119,7 +119,7 @@
       managers:[], overview:null, clubNames:{}, nextKickoff:null, matchday:null,
       estimates:null, estLoading:false, estError:false, estProgress:"", showCalc:false,
       openManager:null, managerSquads:{}, tab:null, loading:false, lineup:null, forms:null,
-      pick:null, lineupNote:null
+      pick:null, lineupNote:null, opp:null, oppLoading:false, kbTeams:[]
     };
   }
   var state = initialState();
@@ -278,6 +278,7 @@
       var names = {};
       ((table && table.it) || []).forEach(function(t){ if (t.tid) names[t.tid] = t.tn; });
       state.clubNames = names;
+      state.kbTeams = ((table && table.it) || []).filter(function(t){ return t.tid; }).map(function(t){ return {tid: String(t.tid), tn: t.tn}; });
 
       state.players = ((squad && squad.it) || []).map(function(p){
         return {
@@ -320,6 +321,7 @@
       els.refreshBtn.classList.remove('spin');
       render();
       loadForms();
+      loadOpponents();
     }).catch(function(err){
       state.loading = false;
       els.refreshBtn.classList.remove('spin');
@@ -443,9 +445,12 @@
     var sub = [];
     if (withPoints && (p.ap != null || formOf(p))) sub.push('≈ ' + Math.round(expected(p)) + ' P');
     if (p.gain != null) sub.push('<span class="' + signCls(p.gain) + '">' + delta(p.gain) + ' seit Kauf</span>');
-    if (p.ap != null) sub.push('Ø ' + p.ap);
+    var c = consOf(p);
+    if (p.ap != null) sub.push('Ø ' + p.ap + (c && c.label ? ' ' + c.label : ''));
     var f = formOf(p);
     if (f && f.recentDays) sub.push(f.recentStarts + '/' + f.recentDays + ' Startelf');
+    var fxh = fixtureHtml(p);
+    if (fxh) sub.push(fxh);
     if (p.offers) sub.push(p.offers + ' Angebot' + (p.offers > 1 ? 'e' : ''));
     if (p.day != null) sub.push('<span class="' + signCls(p.day) + '">24h ' + delta(p.day) + '</span>');
     return '<div class="row' + (sold ? ' on sold' : '') + (compact ? '' : ' np') + '">' +
@@ -472,10 +477,68 @@
   // Erwartete Punkte pro Spieltag: Punkteschnitt, Form der letzten 5 Spieltage,
   // Einsatzquote und Verfuegbarkeit (siehe KBCalc.expectedPoints)
   function formOf(p){ return state.forms ? state.forms[p.id] : null; }
-  function expected(p){ return C.expectedPoints({ap: p.ap, status: p.status, form: formOf(p)}); }
+  function consOf(p){ var f = formOf(p); return f && f.cons ? f.cons : null; }
+  function expected(p){
+    var fx = fixtureOf(p);
+    return C.expectedPoints({ap: p.ap, status: p.status, form: formOf(p), fixture: fx ? fx.factor : 1});
+  }
   function calcEntry(p){
-    // trend: Marktwertaenderung der letzten 24 h (eigener Kader), fuer die Gleichstandsregel
-    return {id: p.id, pos: p.pos, mv: p.mv, ap: p.ap, status: p.status, form: formOf(p), trend: p.day || 0};
+    // trend: Marktwertaenderung der letzten 24 h (eigener Kader), cons: Konstanz - beides fuer Gleichstaende
+    var fx = fixtureOf(p), c = consOf(p);
+    return {id: p.id, pos: p.pos, mv: p.mv, ap: p.ap, status: p.status, form: formOf(p), trend: p.day || 0,
+      fixture: fx ? fx.factor : 1, cons: c && c.n >= 5 ? c.share : null};
+  }
+
+  // ---------- Gegner der naechsten Spiele ----------
+  // Zeitraum: naechstes Spiel oder naechste 3 (gewichtet 50/30/20)
+  var horizon = 3;
+  try { horizon = +localStorage.getItem('kp_horizon') === 1 ? 1 : 3; } catch(e){}
+  var POS_NUM = {TW: 1, ABW: 2, MF: 3, ANG: 4};
+  var fixCache = {};
+  function fixtureOf(p){
+    var m = state.opp;
+    if (!m || !state.league || m.league !== state.league.i || !p.tid || !POS_NUM[p.pos]) return null;
+    if (fixCache[p.id] === undefined) fixCache[p.id] = KBData.fixturesFor(m, POS_NUM[p.pos], p.tid, horizon);
+    return fixCache[p.id];
+  }
+  function loadOpponents(){
+    var l = state.league;
+    if (!state.kbTeams.length) return;
+    state.oppLoading = true;
+    KBData.fetchOpponentModel(client, l.cpi || 1, state.kbTeams).then(function(m){
+      if (state.league !== l) return;
+      m.league = l.i;
+      state.opp = m; state.oppLoading = false; fixCache = {};
+      adviceCache = {key: null, value: null};
+      render();
+    }).catch(function(){
+      if (state.league !== l) return;
+      state.oppLoading = false;
+      render();
+    });
+  }
+  function clubAbbr(tid){
+    var n = state.clubNames[tid] || '';
+    return n.replace(/[^A-Za-zÄÖÜäöüß]/g, '').slice(0, 3).toUpperCase() || '?';
+  }
+  // "vs Kiel (A) · schwer" bzw. "vs KIE, HER, FÜR · leicht"
+  function fixtureHtml(p){
+    var fx = fixtureOf(p);
+    if (!fx || !fx.games.length) return '';
+    var g = fx.games[0];
+    var txt = horizon === 1
+      ? 'vs ' + escapeHtml(state.clubNames[g.opp] || clubAbbr(g.opp)) + ' (' + (g.home ? 'H' : 'A') + ')'
+      : 'vs ' + fx.games.map(function(x){ return escapeHtml(clubAbbr(x.opp)); }).join(', ');
+    var word = fx.factor >= 1.1 ? 'leicht' : (fx.factor <= 0.9 ? 'schwer' : '');
+    return '<span class="' + (word === 'leicht' ? 'up' : (word ? 'neg' : '')) + '">' + txt + (word ? ' · ' + word : '') + '</span>';
+  }
+  function horizonHtml(){
+    if (!state.opp || state.opp.league !== (state.league && state.league.i)){
+      return state.oppLoading ? '<p class="horizon-note">Gegner der nächsten Spiele werden geladen (beim ersten Mal etwa eine Minute) …</p>' : '';
+    }
+    return '<div class="seg sm" role="group" aria-label="Zeitraum für erwartete Punkte">' +
+      '<button type="button" data-horizon="1" class="' + (horizon === 1 ? 'on' : '') + '">Nächstes Spiel</button>' +
+      '<button type="button" data-horizon="3" class="' + (horizon === 3 ? 'on' : '') + '">Nächste 3 Spiele</button></div>';
   }
 
   function loadForms(){
@@ -494,7 +557,7 @@
   // Alle Spieler, die nach Plan im Kader stehen koennen: eigener Kader plus vorgemerkte Kaeufe
   function lineupPool(){
     var bought = state.market.filter(function(m){ return state.bids[m.id] != null; }).map(function(m){
-      return {id: m.id, name: m.name, pos: m.pos, mv: m.mv, ap: m.ap, status: m.status, bought: true};
+      return {id: m.id, name: m.name, pos: m.pos, mv: m.mv, ap: m.ap, status: m.status, tid: m.tid, bought: true};
     });
     return state.players.concat(bought);
   }
@@ -657,6 +720,8 @@
     list.forEach(function(p){
       var f = formOf(p), info = ['≈ ' + Math.round(expected(p)) + ' P'];
       if (f && f.recentDays) info.push(f.recentStarts + '/' + f.recentDays + ' Startelf');
+      var fxh = fixtureHtml(p);
+      if (fxh) info.push(fxh);
       info.push(placed[p.id] ? 'auf dem Feld' : (p.bought ? 'Gebot' : 'Bank'));
       html += '<div class="row"><span class="pos">' + p.pos + '</span>' +
         '<div class="main"><div class="name">' + escapeHtml(p.name) + (p.status ? '<span class="dot"></span>' : '') + '</div><div class="sub num">' + info.join(' · ') + '</div></div>' +
@@ -693,7 +758,7 @@
     var p = plan();
     if (p.after >= 0) return null;
     var sellable = state.players.filter(function(x){ return !state.sell[x.id]; });
-    var key = state.league.i + '|' + p.after + '|' + sellable.map(function(x){ return x.id; }).join(',') + '|' + p.bought.map(function(x){ return x.id; }).join(',') + '|' + !!state.forms;
+    var key = state.league.i + '|' + p.after + '|' + sellable.map(function(x){ return x.id; }).join(',') + '|' + p.bought.map(function(x){ return x.id; }).join(',') + '|' + !!state.forms + '|' + horizon + '|' + (state.opp ? state.opp.at : 0);
     if (adviceCache.key !== key){
       var entry = calcEntry;
       // Vorgemerkte Kaeufe kommen bei Erfolg in den Kader und zaehlen fuer die Elf mit
@@ -723,7 +788,7 @@
           ' · ' + r.formation + '</div></div>' +
         '<button type="button" class="btn" data-advice="' + o[0] + '">Übernehmen</button></div>';
     });
-    return html + '<p class="advice-note">Erwartete Punkte aus Punkteschnitt, Form und Einsatzquote der letzten 5 Spieltage. Bei Gleichstand gehen fallende Marktwerte zuerst. Ausfälle mit Abschlag (angeschlagen 90 %, verletzt 40 %). Verkauf an Kickbase zum Marktwert. Spieler ohne Punkteschnitt (z. B. Neuzugänge) zählen mit 0.</p></div>';
+    return html + '<p class="advice-note">Erwartete Punkte aus Punkteschnitt, Form und Einsatzquote der letzten 5 Spieltage, angepasst an die Gegner der ' + (horizon === 1 ? 'nächsten Partie' : 'nächsten 3 Spiele') + ' (Teamstärke und wie viele Punkte der Gegner auf der Position zulässt). Bei Gleichstand gehen schwankende Spieler und fallende Marktwerte zuerst. Ausfälle mit Abschlag (angeschlagen 90 %, verletzt 40 %). Verkauf an Kickbase zum Marktwert. Spieler ohne Punkteschnitt (z. B. Neuzugänge) zählen mit 0.</p></div>';
   }
 
   function applyAdvice(kind){
@@ -746,6 +811,7 @@
     if (!state.players.length) return html + '<div class="empty">Keine Spieler im Kader.</div></section>';
     html += '<div class="seg" role="group" aria-label="Ansicht"><button type="button" data-kview="pitch" class="' + (kaderView === 'pitch' ? 'on' : '') + '">Aufstellung</button>' +
       '<button type="button" data-kview="list" class="' + (kaderView === 'list' ? 'on' : '') + '">Liste</button></div>';
+    html += horizonHtml();
     html += adviceHtml();
     if (kaderView === 'pitch' && state.lineup) return html + lineupHtml(compact) + '</section>';
     POS_ORDER.concat(["–"]).forEach(function(pos){
@@ -778,6 +844,8 @@
       if (state.nextKickoff && left != null && Date.now() + left * 1000 > state.nextKickoff) sub.push('nach Anpfiff');
     }
     if (p.bids) sub.push(p.bids + ' Gebot' + (p.bids > 1 ? 'e' : ''));
+    var fxm = fixtureHtml(p);
+    if (fxm) sub.push(fxm);
     if (!compact && state.clubNames[p.tid]) sub.push(escapeHtml(state.clubNames[p.tid]));
     var html = '<div class="row' + (marked ? ' on' : '') + (compact ? '' : ' np') + '">' +
       (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
@@ -1002,6 +1070,14 @@
       var s = state.pick.split(':');
       state.lineup.slots[s[0]][+s[1]] = null;
       state.pick = null; saveLineup(); render();
+    });
+    each('#body [data-horizon]', function(b){
+      b.addEventListener('click', function(){
+        horizon = +b.getAttribute('data-horizon') === 1 ? 1 : 3;
+        try { localStorage.setItem('kp_horizon', String(horizon)); } catch(e){}
+        fixCache = {}; adviceCache = {key: null, value: null};
+        render();
+      });
     });
     each('#body [data-kview]', function(b){
       b.addEventListener('click', function(){
