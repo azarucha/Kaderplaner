@@ -1,0 +1,16 @@
+{
+  "name": "kaderplaner",
+  "version": "1.0.0",
+  "description": "Kaderplaner für Kickbase: Kontostand, 33%-Limit und Bietkraft der Gegner als Scriptable-App mit Homescreen-Widget",
+  "private": true,
+  "license": "MIT",
+  "author": "Alexis Zarucha",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "node build.mjs",
+    "deploy": "node build.mjs --deploy",
+    "test": "node --test \"test/*.test.mjs\"",
+    "demo": "node build.mjs && node tools/devserver.mjs",
+    "widget": "node build.mjs && node tools/widget-harness.mjs medium"
+  }
+}

@@ -45,20 +45,43 @@
   }
   var dateFmt = new Intl.DateTimeFormat('de-DE', {weekday:'short', hour:'2-digit', minute:'2-digit'});
 
-  // ---------- Token: Keychain (Scriptable) oder localStorage ----------
+  // ---------- Token und Liga: Keychain (Scriptable) oder localStorage ----------
+  // In Scriptable melden kaderplaner://-Links Aenderungen an den Wrapper. Die
+  // Navigationen laufen nacheinander, damit keine die vorige abbricht.
   var bridge = !!window.__KP_SCRIPTABLE;
+  var bridgeQueue = [];
+  function bridgeSend(path){
+    if (!bridge) return;
+    bridgeQueue.push(path);
+    if (bridgeQueue.length === 1) bridgeNext();
+  }
+  function bridgeNext(){
+    if (!bridgeQueue.length) return;
+    location.href = 'kaderplaner://' + bridgeQueue[0];
+    setTimeout(function(){ bridgeQueue.shift(); bridgeNext(); }, 250);
+  }
   function readToken(){
     if (window.__KP_TOKEN) return window.__KP_TOKEN;
     try { return localStorage.getItem('kb_token'); } catch(e){ return null; }
   }
   function persistToken(t){
     try { localStorage.setItem('kb_token', t); } catch(e){}
-    if (bridge) location.href = 'kaderplaner://token/' + encodeURIComponent(t);
+    bridgeSend('token/' + encodeURIComponent(t));
   }
   function forgetToken(){
     try { localStorage.removeItem('kb_token'); } catch(e){}
     window.__KP_TOKEN = null;
-    if (bridge) location.href = 'kaderplaner://logout';
+    bridgeSend('logout');
+  }
+  function readLeague(){
+    try { var v = localStorage.getItem('kp_league'); if (v) return v; } catch(e){}
+    return window.__KP_LEAGUE || null;
+  }
+  function persistLeague(id){
+    if (readLeague() === String(id) && window.__KP_LEAGUE === String(id)) return;
+    try { localStorage.setItem('kp_league', String(id)); } catch(e){}
+    window.__KP_LEAGUE = String(id);
+    bridgeSend('league/' + encodeURIComponent(id));
   }
   function b64urlDecode(seg){
     seg = seg.replace(/-/g,'+').replace(/_/g,'/');
@@ -152,9 +175,8 @@
     client.get("/leagues/selection").then(function(d){
       state.leagues = (d && d.it) || [];
       if (!state.leagues.length){ els.body.innerHTML = '<div class="empty">Keine Ligen gefunden.</div>'; return; }
-      var last = null;
-      try { last = localStorage.getItem('kp_league'); } catch(e){}
-      var l = state.leagues.filter(function(x){ return String(x.i) === last; })[0] || state.leagues[0];
+      var last = readLeague();
+      var l =state.leagues.filter(function(x){ return String(x.i) === last; })[0] || state.leagues[0];
       openLeague(l);
     }).catch(function(err){ showError(err, loadLeagues); });
   }
@@ -166,7 +188,7 @@
     Object.keys(keep).forEach(function(k){ state[k] = keep[k]; });
     state.league = l;
     state.tab = keepTab;
-    try { localStorage.setItem('kp_league', String(l.i)); } catch(e){}
+    persistLeague(l.i);
     els.leagueName.textContent = l.n || "Liga";
     setTab(state.tab, true);
     loadLeague();
@@ -403,7 +425,7 @@
     if (p.bids) meta.push('<span class="tag">' + p.bids + ' Gebot' + (p.bids > 1 ? 'e' : '') + '</span>');
     if (p.ap != null) meta.push('<span>Ø ' + p.ap + ' P</span>');
     var club = state.clubNames[p.tid];
-    var html = '<div class="card' + (marked ? ' bought' : '') + '"' + (marked ? ' style="border-radius:16px 16px 0 0;margin-bottom:0"' : '') + '>' + photo(p) +
+    var html = '<div class="card' + (marked ? ' bought open' : '') + '">' + photo(p) +
       '<div class="mid"><div class="n">' + escapeHtml(p.name) + (p.status ? ' <span class="dot" title="Status beachten"></span>' : '') + '</div><div class="m">' + meta.join('') + '</div></div>' +
       '<div class="rt"><b class="mono">' + short(p.price) + '</b>' + (club ? '<small style="color:var(--mut)">' + escapeHtml(club) + '</small>' : '') + '</div>' +
       '<button class="act' + (marked ? ' buy' : '') + '" data-buy="' + p.id + '">' + (marked ? 'Vorgemerkt' : 'Bieten') + '</button></div>';
