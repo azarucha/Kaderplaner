@@ -72,20 +72,21 @@
 
   // Pro abgeschlossenem Spieltag: Punkte jedes Managers und Punkte seines besten
   // aufgestellten Spielers. Abgeschlossene Spieltage aendern sich nicht -> Cache.
+  // Ergebnis: {byDay: {day: {uid: {mdp, mpp}}}, dates: {day: Anstoss in ms}}
   function fetchMatchdays(client, leagueId, cpi, myUid, onProgress){
     return client.get("/leagues/" + leagueId + "/managers/" + myUid + "/performance").then(function(perf){
       var season = ((perf && perf.it) || [])[0] || {};
-      var now = Date.now();
+      var now = Date.now(), dates = {};
       var days = (season.it || []).filter(function(d){
         return d.md && Date.parse(d.md) + 3 * 86400000 < now && d.mdp != null;
-      }).map(function(d){ return d.day; });
+      }).map(function(d){ dates[d.day] = Date.parse(d.md); return d.day; });
 
       var result = {}, missing = [];
       days.forEach(function(day){
         var c = cacheGet("kp_md_" + leagueId + "_" + day);
         if (c) result[day] = c; else missing.push(day);
       });
-      if (!missing.length) return result;
+      if (!missing.length) return {byDay: result, dates: dates};
 
       return pool(missing, 3, function(day){
         return client.get("/leagues/" + leagueId + "/users/" + myUid + "/teamcenter?dayNumber=" + day)
@@ -116,7 +117,7 @@
             result[l.day] = byUser;
             cacheSet("kp_md_" + leagueId + "_" + l.day, byUser);
           });
-          return result;
+          return {byDay: result, dates: dates};
         });
       });
     });
@@ -174,7 +175,7 @@
         ]).then(function(x){ return {m: m, transfers: x[0], squad: (x[1] && x[1].it) || [], dash: x[2] || {}}; });
       }).then(function(raw){
         progress("Lade Spieltage …");
-        return fetchMatchdays(ctx.client, lid, cpi, ctx.myUserId, progress).catch(function(){ return {}; }).then(function(mds){
+        return fetchMatchdays(ctx.client, lid, cpi, ctx.myUserId, progress).catch(function(){ return {byDay: {}, dates: {}}; }).then(function(mds){
           return finish(raw, mds, feedSales, rewardInfo);
         });
       });
@@ -191,11 +192,14 @@
         var autoSales = C.detectAutoSales(ledger, squadIds, feedSales);
         var teamValue = r.dash.tv != null ? r.dash.tv : r.squad.reduce(function(s, p){ return s + (p.mv || 0); }, 0);
 
-        var mdp = [], mpp = [];
-        Object.keys(mds).forEach(function(day){
-          var u = mds[day][uid];
-          if (u){ mdp.push(u.mdp); mpp.push(u.mpp); }
+        var mdp = [], mpp = [], byDay = {};
+        Object.keys(mds.byDay).forEach(function(day){
+          var u = mds.byDay[day][uid];
+          if (u){ mdp.push(u.mdp); mpp.push(u.mpp); byDay[day] = u.mdp; }
         });
+        // Buchgewinn: Marktwert minus Kaufpreis der Spieler, die noch im Kader stehen
+        var openGain = r.squad.reduce(function(s, p){ return s + (p.prc != null ? (p.mv || 0) - p.prc : 0); }, 0);
+        var lastTransfer = r.transfers.reduce(function(m, t){ return Math.max(m, Date.parse(t.dt) || 0); }, 0);
 
         var counts = C.achievementCounts({
           wins: r.dash.mdw || 0, matchdayPoints: mdp, maxPlayerPoints: mpp,
@@ -210,7 +214,8 @@
         out[uid] = {
           id: uid, name: r.m.name, teamValue: teamValue, squadSize: r.squad.length,
           seasonPoints: r.dash.tp || 0, wins: r.dash.mdw || 0,
-          ledger: ledger, autoSales: autoSales, counts: counts,
+          ledger: ledger, autoSales: autoSales, counts: counts, transfers: r.transfers,
+          matchdayPoints: byDay, openGain: openGain, lastTransfer: lastTransfer,
           achievements: C.achievementTotal(counts, rewardInfo.rewards),
           loginLow: C.loginTotalForDays(activeDays, login.step, login.cap),
           loginHigh: loginHigh
@@ -237,13 +242,20 @@
           loginLow: o.loginLow, loginHigh: o.loginHigh
         });
         o.freeSlots = ctx.overview.mppu != null ? Math.max(0, ctx.overview.mppu - o.squadSize) : null;
+        o.history = C.balanceHistory({
+          start: ctx.overview.b || 0, created: created, now: now, pointValue: pointValue, transfers: o.transfers,
+          target: o === me && ctx.myBudget != null ? ctx.myBudget : o.estimate.mid,
+          matchdays: Object.keys(o.matchdayPoints).map(function(d){ return {at: mds.dates[d], points: o.matchdayPoints[d]}; })
+        });
+        delete o.transfers;
       });
 
       var check = null;
       if (me && ctx.myBudget != null){
         check = { real: ctx.myBudget, estimate: me.estimate.mid, diff: me.estimate.mid - ctx.myBudget };
       }
-      return { byUser: out, pointValue: pointValue, pointValueCalibrated: calibrated, login: login, check: check, rewardsFromApi: rewardInfo.ownKnown };
+      var days = Object.keys(mds.byDay).map(Number).sort(function(a, b){ return a - b; });
+      return { byUser: out, days: days, pointValue: pointValue, pointValueCalibrated: calibrated, login: login, check: check, rewardsFromApi: rewardInfo.ownKnown };
     }
   }
 

@@ -324,3 +324,19 @@ test('Punkte je Spieltag: Startelf, eingewechselt, ohne Einsatz, kommende Spiele
     { day: 3, p: 0, kind: 'out' }, { day: 4, p: -20, kind: 'start' }
   ]);
 });
+
+test('Kontostand im Verlauf: Transfers und Spieltage mit Datum, Rest verteilt, Ende = Ziel', () => {
+  const D = 86400000, c = Date.parse('2026-08-01T00:00:00Z');
+  const h = C.balanceHistory({
+    start: 75e6, created: c, now: c + 4 * D, target: 70e6, pointValue: 1000,
+    transfers: [{ dt: new Date(c + D / 2).toISOString(), tty: 1, trp: 10e6 }, { dt: new Date(c + 3 * D).toISOString(), tty: 2, trp: 4e6 }],
+    matchdays: [{ at: c + 2 * D, points: 1000 }]
+  });
+  assert.equal(h.length, 5);
+  assert.equal(h[0].v, 75e6);
+  assert.equal(h[h.length - 1].v, 70e6);
+  // Kauf an Tag 1 sichtbar, Rest (70 - 75 + 10 - 4 - 1 = 0) ohne Verteilung
+  assert.equal(h[1].v, 65e6);
+  assert.equal(h[2].v, 66e6);
+  assert.equal(h[3].v, 70e6);
+});

@@ -119,7 +119,8 @@
       managers:[], overview:null, clubNames:{}, nextKickoff:null, matchday:null,
       estimates:null, estLoading:false, estError:false, estProgress:"", showCalc:false,
       openManager:null, managerSquads:{}, tab:null, loading:false, lineup:null, forms:null,
-      pick:null, lineupNote:null, opp:null, oppLoading:false, kbTeams:[]
+      pick:null, lineupNote:null, opp:null, oppLoading:false, kbTeams:[],
+      hideInactive: (function(){ try { return !!localStorage.getItem('kp_hide_inactive'); } catch(e){ return false; } })()
     };
   }
   var state = initialState();
@@ -373,7 +374,7 @@
     var html;
     if (t === 'overview') html = '<div class="cols">' + squadPanel(true) + marketPanel(true) + managersPanel(true) + '</div>';
     else if (t === 'markt') html = marketPanel(false);
-    else if (t === 'gegner') html = managersPanel(false);
+    else if (t === 'gegner') html = '<div class="cols">' + managersPanel(false) + historyPanel() + '</div>';
     else html = squadPanel(false);
     els.body.innerHTML = html;
     bindBody();
@@ -1016,6 +1017,8 @@
     }
 
     var rows = managerRows().filter(function(r){ return r.e; });
+    var inactive = rows.filter(function(r){ return isInactive(r.m, r.e); }).length;
+    if (state.hideInactive) rows = rows.filter(function(r){ return !isInactive(r.m, r.e); });
     rows.sort(function(a, b){ return b.power - a.power || b.mid - a.mid; });
     var max = Math.max.apply(null, rows.map(function(r){ return r.powerHi; }).concat([1]));
     rows.forEach(function(r, i){
@@ -1026,6 +1029,7 @@
       if (e.freeSlots != null) meta.push(e.freeSlots + ' frei');
       meta.push('Kader ' + short(e.teamValue));
       if (!compact) meta.push(r.m.points + ' P' + (e.wins ? ' · ' + e.wins + '× Sieg' : ''));
+      if (isInactive(r.m, e)) meta.push('inaktiv?');
       html += '<button type="button" class="rank' + (r.full ? ' full' : '') + (r.m.isMe ? ' me' : '') + '" data-mgr="' + r.m.id + '">' +
         '<div class="rank-head"><span class="rank-no num">' + (i + 1) + '</span>' +
           '<span class="rank-name">' + (r.m.isMe ? 'Du' : escapeHtml(r.m.name)) + '</span>' +
@@ -1037,8 +1041,117 @@
         (open ? managerSquadHtml(r.m.id) : '') +
       '</button>';
     });
+    if (!compact && inactive) html += '<div class="inact-row"><span>' + inactive + (inactive > 1 ? ' Manager wirken' : ' Manager wirkt') + ' inaktiv (' + INACTIVE_DAYS + ' Tage ohne Transfer, letzter Spieltag ohne Punkte)</span>' +
+      '<button type="button" class="text-btn" id="inactBtn">' + (state.hideInactive ? 'Zeigen' : 'Ausblenden') + '</button></div>';
     return html + '</section>';
   }
+
+  // ---------- Verlauf im Gegner-Tab ----------
+  // Kontostand ueber die Saison, Transfergewinne und Punkte je Spieltag. Eine Ansicht
+  // zur Zeit; die Grafik wird nach dem Einfuegen in der echten Breite gezeichnet.
+  var histView = 'konto', histFocus = null;
+  try { histView = localStorage.getItem('kp_hist_view') || 'konto'; } catch(e){}
+  var INACTIVE_DAYS = 21;
+
+  function isInactive(m, e){
+    if (m.isMe || !e) return false;
+    var days = state.estimates.days, last = days[days.length - 1];
+    var idle = !e.lastTransfer || Date.now() - e.lastTransfer > INACTIVE_DAYS * 86400000;
+    return idle && last != null && !e.matchdayPoints[last];
+  }
+
+  function visibleManagers(){
+    var est = state.estimates;
+    return state.managers.filter(function(m){
+      var e = est.byUser[m.id];
+      return e && !(state.hideInactive && isInactive(m, e));
+    });
+  }
+
+  function historyPanel(){
+    var est = state.estimates;
+    if (!est) return '';
+    var html = '<section class="panel"><div class="panel-head"><h2>Verlauf</h2><span id="histRead" class="num"></span></div>' +
+      '<div class="seg sm">' + [['konto', 'Kontostand'], ['gewinn', 'Transfers'], ['spieltage', 'Spieltage']].map(function(v){
+        return '<button type="button" data-hview="' + v[0] + '" class="' + (histView === v[0] ? 'on' : '') + '">' + v[1] + '</button>';
+      }).join('') + '</div><div id="histBody" class="hist"></div>';
+    return html + '</section>';
+  }
+
+  function managerLabel(m){ return m.isMe ? 'Du' : m.name; }
+
+  function drawHistory(){
+    var box = $('histBody');
+    if (!box || !state.estimates) return;
+    var width = Math.max(260, box.clientWidth), list = visibleManagers(), est = state.estimates, read = $('histRead');
+    if (read) read.innerHTML = '';
+    if (histView === 'konto'){
+      if (!histFocus || !list.some(function(m){ return m.id === histFocus; })){
+        var me = list.filter(function(m){ return m.isMe; })[0];
+        histFocus = (me || list[0] || {}).id;
+      }
+      var focus = list.filter(function(m){ return m.id === histFocus; })[0];
+      var ser = function(m){ return est.byUser[m.id].history.map(function(x){ return {t: x.t, mv: x.v}; }); };
+      if (!focus) { box.innerHTML = ''; return; }
+      var main = ser(focus), others = list.filter(function(m){ return m !== focus; }).map(ser);
+      var opts = {width: width, height: 168, others: others, fmt: short, label: 'Kontostand im Verlauf'};
+      box.innerHTML = '<div class="hist-chart">' + KBCharts.line(main, opts) + '</div>' +
+        '<div class="hist-chips">' + list.map(function(m){
+          return '<button type="button" class="chip' + (m === focus ? ' on' : '') + '" data-hfocus="' + escapeHtml(m.id) + '">' + escapeHtml(managerLabel(m)) + '</button>';
+        }).join('') + '</div>' +
+        '<p class="hist-note">Transfers und Punkteprämien mit Datum, Erfolge und Auflaufprämie gleichmäßig verteilt. Grau: die anderen Manager.</p>';
+      KBCharts.bindLine(box.querySelector('svg'), main, opts, read, function(x){
+        return escapeHtml(managerLabel(focus)) + ' · ' + dateLabel(x.t) + ' · <b>' + short(x.mv) + '</b>';
+      });
+      each('#histBody [data-hfocus]', function(b){
+        b.addEventListener('click', function(){ histFocus = b.getAttribute('data-hfocus'); drawHistory(); });
+      });
+    } else if (histView === 'gewinn'){
+      var rows = list.map(function(m){
+        var e = est.byUser[m.id], real = e.ledger.profits.reduce(function(a, b){ return a + b; }, 0);
+        return {m: m, real: real, open: e.openGain, sales: e.ledger.profits.length};
+      }).sort(function(a, b){ return b.real - a.real; });
+      var max = Math.max.apply(null, rows.map(function(r){ return Math.abs(r.real); }).concat([1]));
+      var hasNeg = rows.some(function(r){ return r.real < 0; }), zero = hasNeg ? 50 : 0, scale = hasNeg ? 50 : 100;
+      box.innerHTML = rows.map(function(r){
+        var w = Math.abs(r.real) / max * scale, left = r.real < 0 ? zero - w : zero;
+        return '<div class="pl-row' + (r.m.isMe ? ' me' : '') + '"><div class="pl-head"><span class="pl-name">' + escapeHtml(managerLabel(r.m)) + '</span>' +
+          '<span class="pl-val num ' + signCls(r.real) + '">' + delta(r.real) + '</span></div>' +
+          '<div class="pl-bar">' + (hasNeg ? '<em style="left:50%"></em>' : '') +
+            '<i class="' + (r.real < 0 ? 'neg' : 'pos') + '" style="left:' + left.toFixed(1) + '%;width:' + w.toFixed(1) + '%"></i></div>' +
+          '<div class="pl-meta num">' + r.sales + ' Verkäufe · im Kader <span class="' + signCls(r.open) + '">' + delta(r.open) + '</span></div></div>';
+      }).join('') + '<p class="hist-note">Gewinn = Verkaufspreis minus Kaufpreis aller verkauften Spieler seit Ligastart. „Im Kader“: Marktwert minus Kaufpreis der Spieler, die noch da sind.</p>';
+    } else {
+      var days = est.days;
+      if (!days.length){ box.innerHTML = '<p class="hist-note">Noch kein Spieltag abgeschlossen.</p>'; return; }
+      var n = Math.max(1, Math.min(days.length, Math.floor((width - 96 - 52) / 40))), shown = days.slice(-n);
+      var tot = function(m){ return days.reduce(function(s, d){ return s + (est.byUser[m.id].matchdayPoints[d] || 0); }, 0); };
+      var sorted = list.slice().sort(function(a, b){ return tot(b) - tot(a); });
+      var colMax = {}, colMin = {};
+      shown.forEach(function(d){
+        var v = sorted.map(function(m){ return est.byUser[m.id].matchdayPoints[d] || 0; });
+        colMax[d] = Math.max.apply(null, v); colMin[d] = Math.min.apply(null, v);
+      });
+      var html = '<div class="hm-grid" style="grid-template-columns:minmax(0,1fr) repeat(' + n + ', 36px) 48px"><span></span>' +
+        shown.map(function(d){ return '<span class="hm-day num">' + d + '.</span>'; }).join('') + '<span class="hm-day num">Σ</span>';
+      sorted.forEach(function(m){
+        html += '<span class="hm-name' + (m.isMe ? ' me' : '') + '">' + escapeHtml(managerLabel(m)) + '</span>';
+        shown.forEach(function(d){
+          var v = est.byUser[m.id].matchdayPoints[d];
+          if (v == null){ html += '<span class="hm num">–</span>'; return; }
+          var span = colMax[d] - colMin[d] || 1, a = 0.05 + 0.3 * (v - colMin[d]) / span, win = v === colMax[d] && v > 0;
+          html += '<span class="hm num' + (win ? ' win' : '') + '" style="--a:' + a.toFixed(2) + '" title="' + d + '. Spieltag: ' + v + ' Punkte">' + v + '</span>';
+        });
+        html += '<span class="hm-sum num">' + tot(m) + '</span>';
+      });
+      box.innerHTML = html + '</div><p class="hist-note">Punkte je Spieltag, dunkler = mehr. Schwarz hinterlegt: Spieltagssieg.' +
+        (n < days.length ? ' Zu sehen sind die letzten ' + n + ' von ' + days.length + ' Spieltagen, Σ zählt alle.' : '') + '</p>';
+    }
+  }
+
+  function dateLabel(t){ var d = new Date(t); return d.getDate() + '.' + (d.getMonth() + 1) + '.'; }
+  var histResize = null;
+  window.addEventListener('resize', function(){ clearTimeout(histResize); histResize = setTimeout(drawHistory, 150); });
 
   function loadManagerSquad(uid){
     state.managerSquads[uid] = {loading: true};
@@ -1114,6 +1227,21 @@
   }
 
   function bindBody(){
+    each('#body [data-hview]', function(b){
+      b.addEventListener('click', function(){
+        histView = b.getAttribute('data-hview');
+        try { localStorage.setItem('kp_hist_view', histView); } catch(e){}
+        each('#body [data-hview]', function(x){ x.classList.toggle('on', x === b); });
+        drawHistory();
+      });
+    });
+    var inactBtn = $('inactBtn');
+    if (inactBtn) inactBtn.addEventListener('click', function(){
+      state.hideInactive = !state.hideInactive;
+      try { localStorage.setItem('kp_hide_inactive', state.hideInactive ? '1' : ''); } catch(e){}
+      render();
+    });
+    drawHistory();
     each('#body .row[data-player]', function(r){
       r.addEventListener('click', function(e){
         if (e.target.closest('button, input, label, a')) return;

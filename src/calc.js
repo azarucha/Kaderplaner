@@ -566,6 +566,33 @@
     return {base: base, ref: ref, gains: gains, list: out};
   }
 
+  // ---------- Kontostand im Verlauf ----------
+  // Ein Wert je Tag vom Ligastart bis jetzt. Transfers und Punktepraemien stehen mit
+  // Datum fest; was kein Datum hat (Erfolge, Auflaufpraemie, Auto-Verkaeufe, Rundung
+  // der Punkte), wird gleichmaessig ueber die Zeit verteilt, sodass der letzte Wert
+  // genau `target` ist (Schaetzung Mitte, beim eigenen Konto der echte Stand).
+  // o: {start, created, now, target, transfers [{dt, tty, trp}], matchdays [{at, points}], pointValue}
+  function balanceHistory(o){
+    var events = [];
+    (o.transfers || []).forEach(function(x){
+      var t = Date.parse(x.dt);
+      if (isFinite(t)) events.push({t: t, v: x.tty === 1 ? -(x.trp || 0) : (x.trp || 0)});
+    });
+    (o.matchdays || []).forEach(function(m){
+      if (isFinite(m.at)) events.push({t: m.at, v: (m.points || 0) * (o.pointValue || 0)});
+    });
+    events.sort(function(a, b){ return a.t - b.t; });
+    var total = events.reduce(function(s, e){ return s + e.v; }, 0);
+    var spread = o.target - (o.start || 0) - total, span = Math.max(1, o.now - o.created);
+    var out = [], sum = o.start || 0, k = 0;
+    for (var t = o.created; ; t = Math.min(t + DAY_MS, o.now)){
+      while (k < events.length && events[k].t <= t){ sum += events[k].v; k++; }
+      out.push({t: t, v: Math.round(sum + spread * (t - o.created) / span)});
+      if (t >= o.now) break;
+    }
+    return out;
+  }
+
   // ---------- Spieler-Detail ----------
   // Marktwertverlauf aus /players/{P}/marketvalue/92: dt ist ein Tagesindex seit
   // 1970 (zur Sicherheit auch ms oder ISO-Text). Sortiert, ohne Luecken-Eintraege.
@@ -597,6 +624,7 @@
   }
 
   return {
+    balanceHistory: balanceHistory,
     mvSeries: mvSeries,
     mvAt: mvAt,
     matchdayPoints: matchdayPoints,

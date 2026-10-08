@@ -28,10 +28,11 @@
   function lineGeom(series, opts){
     var w = opts.width, h = opts.height || 132, plotH = h - PLOT_TOP - AXIS_H, plotW = w - LABEL_W;
     var vals = series.map(function(p){ return p.mv; });
+    (opts.others || []).forEach(function(o){ o.forEach(function(p){ vals.push(p.mv); }); });
     if (opts.ref != null) vals.push(opts.ref);
     var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
     var pad = (hi - lo) * 0.08 || hi * 0.05 || 1;
-    lo = Math.max(0, lo - pad); hi = hi + pad;
+    lo = lo >= 0 ? Math.max(0, lo - pad) : lo - pad; hi = hi + pad;
     var t0 = series[0].t, t1 = series[series.length - 1].t;
     return {
       w: w, h: h, plotW: plotW, plotH: plotH, lo: lo, hi: hi,
@@ -44,7 +45,7 @@
     if (!series || series.length < 2) return '';
     var g = lineGeom(series, opts), fmt = opts.fmt || String, out = [];
     out.push('<svg class="ch" width="' + g.w + '" height="' + g.h + '" viewBox="0 0 ' + g.w + ' ' + g.h + '" role="img" aria-label="' + esc(opts.label || '') + '">');
-    ticks(g.lo, g.hi, 3).forEach(function(v){
+    ticks(g.lo, g.hi, 4).forEach(function(v){
       var y = r1(g.y(v));
       out.push('<line class="ch-grid" x1="0" x2="' + g.plotW + '" y1="' + y + '" y2="' + y + '"/>');
       out.push('<text x="' + (g.plotW + 8) + '" y="' + (y + 4) + '">' + esc(fmt(v)) + '</text>');
@@ -57,8 +58,11 @@
       out.push('<line class="ch-ref" x1="0" x2="' + g.plotW + '" y1="' + ry + '" y2="' + ry + '"/>');
       if (opts.refLabel) out.push('<text class="ch-reflabel" x="4" y="' + (ry - 5) + '">' + esc(opts.refLabel) + '</text>');
     }
-    var d = series.map(function(p, i){ return (i ? 'L' : 'M') + r1(g.x(p.t)) + ' ' + r1(g.y(p.mv)); }).join('');
-    out.push('<path class="ch-line" d="' + d + '"/>');
+    var path = function(s){ return s.map(function(p, i){ return (i ? 'L' : 'M') + r1(g.x(p.t)) + ' ' + r1(g.y(p.mv)); }).join(''); };
+    // Vergleichslinien (andere Manager) zuerst und zurueckgenommen, die eigene obenauf
+    (opts.others || []).forEach(function(o){ if (o.length > 1) out.push('<path class="ch-line other" d="' + path(o) + '"/>'); });
+    if (g.lo < 0 && g.hi > 0) out.push('<line class="ch-zero" x1="0" x2="' + g.plotW + '" y1="' + r1(g.y(0)) + '" y2="' + r1(g.y(0)) + '"/>');
+    out.push('<path class="ch-line" d="' + path(series) + '"/>');
     out.push('<line class="ch-cross" data-cross x1="0" x2="0" y1="' + PLOT_TOP + '" y2="' + base + '" hidden/>');
     var last = series[series.length - 1];
     out.push('<circle class="ch-dot" data-dot r="4" cx="' + r1(g.x(last.t)) + '" cy="' + r1(g.y(last.mv)) + '"/>');

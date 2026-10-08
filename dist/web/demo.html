@@ -392,6 +392,41 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
 .ch.picking .ch-bar:not(.on){ opacity:.35; }
 .ch-hit{ fill:transparent; }
 
+/* Verlauf im Gegner-Tab */
+.hist{ padding:14px 20px 0; }
+.hist-chart{ min-height:168px; }
+.ch-line.other{ stroke:var(--faint); stroke-width:1.5; opacity:.6; }
+.ch-zero{ stroke:var(--faint); stroke-width:1; }
+.hist-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+.hist-chips .chip{ padding:0 12px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hist-note{ margin-top:12px; font-size:12px; line-height:1.5; color:var(--mut); }
+.pl-row{ padding:10px 0; border-top:1px solid var(--line2); }
+.pl-row:first-child{ border-top:0; padding-top:0; }
+.pl-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+.pl-name{ min-width:0; font-size:15px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pl-row.me .pl-name{ font-weight:600; }
+.pl-val{ font-size:15px; font-weight:600; }
+.pl-bar{ position:relative; height:4px; margin:8px 0 6px; border-radius:2px; background:var(--line); }
+.pl-bar i{ position:absolute; top:0; bottom:0; border-radius:2px; }
+.pl-bar i.pos{ background:var(--acc); } .pl-bar i.neg{ background:var(--neg); }
+.pl-bar em{ position:absolute; top:-3px; bottom:-3px; width:1px; margin-left:-.5px; background:var(--faint); }
+.pl-meta{ font-size:12px; color:var(--mut); }
+.hm-grid{ display:grid; gap:4px; align-items:center; }
+.hm-grid > .hm-name{ padding-right:4px; }
+.hm-day{ font-size:12px; color:var(--mut); text-align:center; }
+.hm-day:last-child{ text-align:right; }
+.hm-name{ min-width:0; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hm-name.me{ font-weight:600; }
+.hm{ position:relative; z-index:0; height:30px; display:grid; place-items:center; font-size:11.5px; letter-spacing:-.01em; }
+.hm::before{ content:""; position:absolute; inset:0; z-index:-1; border-radius:6px; background:var(--ink); opacity:var(--a, 0); }
+.hm.win{ color:var(--inv-ink); font-weight:600; }
+.hm.win::before{ opacity:1; }
+.hm-sum{ font-size:13px; font-weight:600; text-align:right; }
+.inact-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:4px 20px 0; border-top:1px solid var(--line2); font-size:12.5px; color:var(--mut); }
+@media (min-width: 1000px){
+  .hist, .inact-row{ padding-left:0; padding-right:0; }
+}
+
 </style>
 </head>
 <body>
@@ -1295,6 +1330,33 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     return {base: base, ref: ref, gains: gains, list: out};
   }
 
+  // ---------- Kontostand im Verlauf ----------
+  // Ein Wert je Tag vom Ligastart bis jetzt. Transfers und Punktepraemien stehen mit
+  // Datum fest; was kein Datum hat (Erfolge, Auflaufpraemie, Auto-Verkaeufe, Rundung
+  // der Punkte), wird gleichmaessig ueber die Zeit verteilt, sodass der letzte Wert
+  // genau `target` ist (Schaetzung Mitte, beim eigenen Konto der echte Stand).
+  // o: {start, created, now, target, transfers [{dt, tty, trp}], matchdays [{at, points}], pointValue}
+  function balanceHistory(o){
+    var events = [];
+    (o.transfers || []).forEach(function(x){
+      var t = Date.parse(x.dt);
+      if (isFinite(t)) events.push({t: t, v: x.tty === 1 ? -(x.trp || 0) : (x.trp || 0)});
+    });
+    (o.matchdays || []).forEach(function(m){
+      if (isFinite(m.at)) events.push({t: m.at, v: (m.points || 0) * (o.pointValue || 0)});
+    });
+    events.sort(function(a, b){ return a.t - b.t; });
+    var total = events.reduce(function(s, e){ return s + e.v; }, 0);
+    var spread = o.target - (o.start || 0) - total, span = Math.max(1, o.now - o.created);
+    var out = [], sum = o.start || 0, k = 0;
+    for (var t = o.created; ; t = Math.min(t + DAY_MS, o.now)){
+      while (k < events.length && events[k].t <= t){ sum += events[k].v; k++; }
+      out.push({t: t, v: Math.round(sum + spread * (t - o.created) / span)});
+      if (t >= o.now) break;
+    }
+    return out;
+  }
+
   // ---------- Spieler-Detail ----------
   // Marktwertverlauf aus /players/{P}/marketvalue/92: dt ist ein Tagesindex seit
   // 1970 (zur Sicherheit auch ms oder ISO-Text). Sortiert, ohne Luecken-Eintraege.
@@ -1326,6 +1388,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   }
 
   return {
+    balanceHistory: balanceHistory,
     mvSeries: mvSeries,
     mvAt: mvAt,
     matchdayPoints: matchdayPoints,
@@ -1437,20 +1500,21 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
 
   // Pro abgeschlossenem Spieltag: Punkte jedes Managers und Punkte seines besten
   // aufgestellten Spielers. Abgeschlossene Spieltage aendern sich nicht -> Cache.
+  // Ergebnis: {byDay: {day: {uid: {mdp, mpp}}}, dates: {day: Anstoss in ms}}
   function fetchMatchdays(client, leagueId, cpi, myUid, onProgress){
     return client.get("/leagues/" + leagueId + "/managers/" + myUid + "/performance").then(function(perf){
       var season = ((perf && perf.it) || [])[0] || {};
-      var now = Date.now();
+      var now = Date.now(), dates = {};
       var days = (season.it || []).filter(function(d){
         return d.md && Date.parse(d.md) + 3 * 86400000 < now && d.mdp != null;
-      }).map(function(d){ return d.day; });
+      }).map(function(d){ dates[d.day] = Date.parse(d.md); return d.day; });
 
       var result = {}, missing = [];
       days.forEach(function(day){
         var c = cacheGet("kp_md_" + leagueId + "_" + day);
         if (c) result[day] = c; else missing.push(day);
       });
-      if (!missing.length) return result;
+      if (!missing.length) return {byDay: result, dates: dates};
 
       return pool(missing, 3, function(day){
         return client.get("/leagues/" + leagueId + "/users/" + myUid + "/teamcenter?dayNumber=" + day)
@@ -1481,7 +1545,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
             result[l.day] = byUser;
             cacheSet("kp_md_" + leagueId + "_" + l.day, byUser);
           });
-          return result;
+          return {byDay: result, dates: dates};
         });
       });
     });
@@ -1539,7 +1603,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
         ]).then(function(x){ return {m: m, transfers: x[0], squad: (x[1] && x[1].it) || [], dash: x[2] || {}}; });
       }).then(function(raw){
         progress("Lade Spieltage …");
-        return fetchMatchdays(ctx.client, lid, cpi, ctx.myUserId, progress).catch(function(){ return {}; }).then(function(mds){
+        return fetchMatchdays(ctx.client, lid, cpi, ctx.myUserId, progress).catch(function(){ return {byDay: {}, dates: {}}; }).then(function(mds){
           return finish(raw, mds, feedSales, rewardInfo);
         });
       });
@@ -1556,11 +1620,14 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
         var autoSales = C.detectAutoSales(ledger, squadIds, feedSales);
         var teamValue = r.dash.tv != null ? r.dash.tv : r.squad.reduce(function(s, p){ return s + (p.mv || 0); }, 0);
 
-        var mdp = [], mpp = [];
-        Object.keys(mds).forEach(function(day){
-          var u = mds[day][uid];
-          if (u){ mdp.push(u.mdp); mpp.push(u.mpp); }
+        var mdp = [], mpp = [], byDay = {};
+        Object.keys(mds.byDay).forEach(function(day){
+          var u = mds.byDay[day][uid];
+          if (u){ mdp.push(u.mdp); mpp.push(u.mpp); byDay[day] = u.mdp; }
         });
+        // Buchgewinn: Marktwert minus Kaufpreis der Spieler, die noch im Kader stehen
+        var openGain = r.squad.reduce(function(s, p){ return s + (p.prc != null ? (p.mv || 0) - p.prc : 0); }, 0);
+        var lastTransfer = r.transfers.reduce(function(m, t){ return Math.max(m, Date.parse(t.dt) || 0); }, 0);
 
         var counts = C.achievementCounts({
           wins: r.dash.mdw || 0, matchdayPoints: mdp, maxPlayerPoints: mpp,
@@ -1575,7 +1642,8 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
         out[uid] = {
           id: uid, name: r.m.name, teamValue: teamValue, squadSize: r.squad.length,
           seasonPoints: r.dash.tp || 0, wins: r.dash.mdw || 0,
-          ledger: ledger, autoSales: autoSales, counts: counts,
+          ledger: ledger, autoSales: autoSales, counts: counts, transfers: r.transfers,
+          matchdayPoints: byDay, openGain: openGain, lastTransfer: lastTransfer,
           achievements: C.achievementTotal(counts, rewardInfo.rewards),
           loginLow: C.loginTotalForDays(activeDays, login.step, login.cap),
           loginHigh: loginHigh
@@ -1602,13 +1670,20 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
           loginLow: o.loginLow, loginHigh: o.loginHigh
         });
         o.freeSlots = ctx.overview.mppu != null ? Math.max(0, ctx.overview.mppu - o.squadSize) : null;
+        o.history = C.balanceHistory({
+          start: ctx.overview.b || 0, created: created, now: now, pointValue: pointValue, transfers: o.transfers,
+          target: o === me && ctx.myBudget != null ? ctx.myBudget : o.estimate.mid,
+          matchdays: Object.keys(o.matchdayPoints).map(function(d){ return {at: mds.dates[d], points: o.matchdayPoints[d]}; })
+        });
+        delete o.transfers;
       });
 
       var check = null;
       if (me && ctx.myBudget != null){
         check = { real: ctx.myBudget, estimate: me.estimate.mid, diff: me.estimate.mid - ctx.myBudget };
       }
-      return { byUser: out, pointValue: pointValue, pointValueCalibrated: calibrated, login: login, check: check, rewardsFromApi: rewardInfo.ownKnown };
+      var days = Object.keys(mds.byDay).map(Number).sort(function(a, b){ return a - b; });
+      return { byUser: out, days: days, pointValue: pointValue, pointValueCalibrated: calibrated, login: login, check: check, rewardsFromApi: rewardInfo.ownKnown };
     }
   }
 
@@ -1864,10 +1939,11 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   function lineGeom(series, opts){
     var w = opts.width, h = opts.height || 132, plotH = h - PLOT_TOP - AXIS_H, plotW = w - LABEL_W;
     var vals = series.map(function(p){ return p.mv; });
+    (opts.others || []).forEach(function(o){ o.forEach(function(p){ vals.push(p.mv); }); });
     if (opts.ref != null) vals.push(opts.ref);
     var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
     var pad = (hi - lo) * 0.08 || hi * 0.05 || 1;
-    lo = Math.max(0, lo - pad); hi = hi + pad;
+    lo = lo >= 0 ? Math.max(0, lo - pad) : lo - pad; hi = hi + pad;
     var t0 = series[0].t, t1 = series[series.length - 1].t;
     return {
       w: w, h: h, plotW: plotW, plotH: plotH, lo: lo, hi: hi,
@@ -1880,7 +1956,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     if (!series || series.length < 2) return '';
     var g = lineGeom(series, opts), fmt = opts.fmt || String, out = [];
     out.push('<svg class="ch" width="' + g.w + '" height="' + g.h + '" viewBox="0 0 ' + g.w + ' ' + g.h + '" role="img" aria-label="' + esc(opts.label || '') + '">');
-    ticks(g.lo, g.hi, 3).forEach(function(v){
+    ticks(g.lo, g.hi, 4).forEach(function(v){
       var y = r1(g.y(v));
       out.push('<line class="ch-grid" x1="0" x2="' + g.plotW + '" y1="' + y + '" y2="' + y + '"/>');
       out.push('<text x="' + (g.plotW + 8) + '" y="' + (y + 4) + '">' + esc(fmt(v)) + '</text>');
@@ -1893,8 +1969,11 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       out.push('<line class="ch-ref" x1="0" x2="' + g.plotW + '" y1="' + ry + '" y2="' + ry + '"/>');
       if (opts.refLabel) out.push('<text class="ch-reflabel" x="4" y="' + (ry - 5) + '">' + esc(opts.refLabel) + '</text>');
     }
-    var d = series.map(function(p, i){ return (i ? 'L' : 'M') + r1(g.x(p.t)) + ' ' + r1(g.y(p.mv)); }).join('');
-    out.push('<path class="ch-line" d="' + d + '"/>');
+    var path = function(s){ return s.map(function(p, i){ return (i ? 'L' : 'M') + r1(g.x(p.t)) + ' ' + r1(g.y(p.mv)); }).join(''); };
+    // Vergleichslinien (andere Manager) zuerst und zurueckgenommen, die eigene obenauf
+    (opts.others || []).forEach(function(o){ if (o.length > 1) out.push('<path class="ch-line other" d="' + path(o) + '"/>'); });
+    if (g.lo < 0 && g.hi > 0) out.push('<line class="ch-zero" x1="0" x2="' + g.plotW + '" y1="' + r1(g.y(0)) + '" y2="' + r1(g.y(0)) + '"/>');
+    out.push('<path class="ch-line" d="' + path(series) + '"/>');
     out.push('<line class="ch-cross" data-cross x1="0" x2="0" y1="' + PLOT_TOP + '" y2="' + base + '" hidden/>');
     var last = series[series.length - 1];
     out.push('<circle class="ch-dot" data-dot r="4" cx="' + r1(g.x(last.t)) + '" cy="' + r1(g.y(last.mv)) + '"/>');
@@ -2122,7 +2201,8 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       managers:[], overview:null, clubNames:{}, nextKickoff:null, matchday:null,
       estimates:null, estLoading:false, estError:false, estProgress:"", showCalc:false,
       openManager:null, managerSquads:{}, tab:null, loading:false, lineup:null, forms:null,
-      pick:null, lineupNote:null, opp:null, oppLoading:false, kbTeams:[]
+      pick:null, lineupNote:null, opp:null, oppLoading:false, kbTeams:[],
+      hideInactive: (function(){ try { return !!localStorage.getItem('kp_hide_inactive'); } catch(e){ return false; } })()
     };
   }
   var state = initialState();
@@ -2376,7 +2456,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     var html;
     if (t === 'overview') html = '<div class="cols">' + squadPanel(true) + marketPanel(true) + managersPanel(true) + '</div>';
     else if (t === 'markt') html = marketPanel(false);
-    else if (t === 'gegner') html = managersPanel(false);
+    else if (t === 'gegner') html = '<div class="cols">' + managersPanel(false) + historyPanel() + '</div>';
     else html = squadPanel(false);
     els.body.innerHTML = html;
     bindBody();
@@ -3019,6 +3099,8 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     }
 
     var rows = managerRows().filter(function(r){ return r.e; });
+    var inactive = rows.filter(function(r){ return isInactive(r.m, r.e); }).length;
+    if (state.hideInactive) rows = rows.filter(function(r){ return !isInactive(r.m, r.e); });
     rows.sort(function(a, b){ return b.power - a.power || b.mid - a.mid; });
     var max = Math.max.apply(null, rows.map(function(r){ return r.powerHi; }).concat([1]));
     rows.forEach(function(r, i){
@@ -3029,6 +3111,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       if (e.freeSlots != null) meta.push(e.freeSlots + ' frei');
       meta.push('Kader ' + short(e.teamValue));
       if (!compact) meta.push(r.m.points + ' P' + (e.wins ? ' · ' + e.wins + '× Sieg' : ''));
+      if (isInactive(r.m, e)) meta.push('inaktiv?');
       html += '<button type="button" class="rank' + (r.full ? ' full' : '') + (r.m.isMe ? ' me' : '') + '" data-mgr="' + r.m.id + '">' +
         '<div class="rank-head"><span class="rank-no num">' + (i + 1) + '</span>' +
           '<span class="rank-name">' + (r.m.isMe ? 'Du' : escapeHtml(r.m.name)) + '</span>' +
@@ -3040,8 +3123,117 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
         (open ? managerSquadHtml(r.m.id) : '') +
       '</button>';
     });
+    if (!compact && inactive) html += '<div class="inact-row"><span>' + inactive + (inactive > 1 ? ' Manager wirken' : ' Manager wirkt') + ' inaktiv (' + INACTIVE_DAYS + ' Tage ohne Transfer, letzter Spieltag ohne Punkte)</span>' +
+      '<button type="button" class="text-btn" id="inactBtn">' + (state.hideInactive ? 'Zeigen' : 'Ausblenden') + '</button></div>';
     return html + '</section>';
   }
+
+  // ---------- Verlauf im Gegner-Tab ----------
+  // Kontostand ueber die Saison, Transfergewinne und Punkte je Spieltag. Eine Ansicht
+  // zur Zeit; die Grafik wird nach dem Einfuegen in der echten Breite gezeichnet.
+  var histView = 'konto', histFocus = null;
+  try { histView = localStorage.getItem('kp_hist_view') || 'konto'; } catch(e){}
+  var INACTIVE_DAYS = 21;
+
+  function isInactive(m, e){
+    if (m.isMe || !e) return false;
+    var days = state.estimates.days, last = days[days.length - 1];
+    var idle = !e.lastTransfer || Date.now() - e.lastTransfer > INACTIVE_DAYS * 86400000;
+    return idle && last != null && !e.matchdayPoints[last];
+  }
+
+  function visibleManagers(){
+    var est = state.estimates;
+    return state.managers.filter(function(m){
+      var e = est.byUser[m.id];
+      return e && !(state.hideInactive && isInactive(m, e));
+    });
+  }
+
+  function historyPanel(){
+    var est = state.estimates;
+    if (!est) return '';
+    var html = '<section class="panel"><div class="panel-head"><h2>Verlauf</h2><span id="histRead" class="num"></span></div>' +
+      '<div class="seg sm">' + [['konto', 'Kontostand'], ['gewinn', 'Transfers'], ['spieltage', 'Spieltage']].map(function(v){
+        return '<button type="button" data-hview="' + v[0] + '" class="' + (histView === v[0] ? 'on' : '') + '">' + v[1] + '</button>';
+      }).join('') + '</div><div id="histBody" class="hist"></div>';
+    return html + '</section>';
+  }
+
+  function managerLabel(m){ return m.isMe ? 'Du' : m.name; }
+
+  function drawHistory(){
+    var box = $('histBody');
+    if (!box || !state.estimates) return;
+    var width = Math.max(260, box.clientWidth), list = visibleManagers(), est = state.estimates, read = $('histRead');
+    if (read) read.innerHTML = '';
+    if (histView === 'konto'){
+      if (!histFocus || !list.some(function(m){ return m.id === histFocus; })){
+        var me = list.filter(function(m){ return m.isMe; })[0];
+        histFocus = (me || list[0] || {}).id;
+      }
+      var focus = list.filter(function(m){ return m.id === histFocus; })[0];
+      var ser = function(m){ return est.byUser[m.id].history.map(function(x){ return {t: x.t, mv: x.v}; }); };
+      if (!focus) { box.innerHTML = ''; return; }
+      var main = ser(focus), others = list.filter(function(m){ return m !== focus; }).map(ser);
+      var opts = {width: width, height: 168, others: others, fmt: short, label: 'Kontostand im Verlauf'};
+      box.innerHTML = '<div class="hist-chart">' + KBCharts.line(main, opts) + '</div>' +
+        '<div class="hist-chips">' + list.map(function(m){
+          return '<button type="button" class="chip' + (m === focus ? ' on' : '') + '" data-hfocus="' + escapeHtml(m.id) + '">' + escapeHtml(managerLabel(m)) + '</button>';
+        }).join('') + '</div>' +
+        '<p class="hist-note">Transfers und Punkteprämien mit Datum, Erfolge und Auflaufprämie gleichmäßig verteilt. Grau: die anderen Manager.</p>';
+      KBCharts.bindLine(box.querySelector('svg'), main, opts, read, function(x){
+        return escapeHtml(managerLabel(focus)) + ' · ' + dateLabel(x.t) + ' · <b>' + short(x.mv) + '</b>';
+      });
+      each('#histBody [data-hfocus]', function(b){
+        b.addEventListener('click', function(){ histFocus = b.getAttribute('data-hfocus'); drawHistory(); });
+      });
+    } else if (histView === 'gewinn'){
+      var rows = list.map(function(m){
+        var e = est.byUser[m.id], real = e.ledger.profits.reduce(function(a, b){ return a + b; }, 0);
+        return {m: m, real: real, open: e.openGain, sales: e.ledger.profits.length};
+      }).sort(function(a, b){ return b.real - a.real; });
+      var max = Math.max.apply(null, rows.map(function(r){ return Math.abs(r.real); }).concat([1]));
+      var hasNeg = rows.some(function(r){ return r.real < 0; }), zero = hasNeg ? 50 : 0, scale = hasNeg ? 50 : 100;
+      box.innerHTML = rows.map(function(r){
+        var w = Math.abs(r.real) / max * scale, left = r.real < 0 ? zero - w : zero;
+        return '<div class="pl-row' + (r.m.isMe ? ' me' : '') + '"><div class="pl-head"><span class="pl-name">' + escapeHtml(managerLabel(r.m)) + '</span>' +
+          '<span class="pl-val num ' + signCls(r.real) + '">' + delta(r.real) + '</span></div>' +
+          '<div class="pl-bar">' + (hasNeg ? '<em style="left:50%"></em>' : '') +
+            '<i class="' + (r.real < 0 ? 'neg' : 'pos') + '" style="left:' + left.toFixed(1) + '%;width:' + w.toFixed(1) + '%"></i></div>' +
+          '<div class="pl-meta num">' + r.sales + ' Verkäufe · im Kader <span class="' + signCls(r.open) + '">' + delta(r.open) + '</span></div></div>';
+      }).join('') + '<p class="hist-note">Gewinn = Verkaufspreis minus Kaufpreis aller verkauften Spieler seit Ligastart. „Im Kader“: Marktwert minus Kaufpreis der Spieler, die noch da sind.</p>';
+    } else {
+      var days = est.days;
+      if (!days.length){ box.innerHTML = '<p class="hist-note">Noch kein Spieltag abgeschlossen.</p>'; return; }
+      var n = Math.max(1, Math.min(days.length, Math.floor((width - 96 - 52) / 40))), shown = days.slice(-n);
+      var tot = function(m){ return days.reduce(function(s, d){ return s + (est.byUser[m.id].matchdayPoints[d] || 0); }, 0); };
+      var sorted = list.slice().sort(function(a, b){ return tot(b) - tot(a); });
+      var colMax = {}, colMin = {};
+      shown.forEach(function(d){
+        var v = sorted.map(function(m){ return est.byUser[m.id].matchdayPoints[d] || 0; });
+        colMax[d] = Math.max.apply(null, v); colMin[d] = Math.min.apply(null, v);
+      });
+      var html = '<div class="hm-grid" style="grid-template-columns:minmax(0,1fr) repeat(' + n + ', 36px) 48px"><span></span>' +
+        shown.map(function(d){ return '<span class="hm-day num">' + d + '.</span>'; }).join('') + '<span class="hm-day num">Σ</span>';
+      sorted.forEach(function(m){
+        html += '<span class="hm-name' + (m.isMe ? ' me' : '') + '">' + escapeHtml(managerLabel(m)) + '</span>';
+        shown.forEach(function(d){
+          var v = est.byUser[m.id].matchdayPoints[d];
+          if (v == null){ html += '<span class="hm num">–</span>'; return; }
+          var span = colMax[d] - colMin[d] || 1, a = 0.05 + 0.3 * (v - colMin[d]) / span, win = v === colMax[d] && v > 0;
+          html += '<span class="hm num' + (win ? ' win' : '') + '" style="--a:' + a.toFixed(2) + '" title="' + d + '. Spieltag: ' + v + ' Punkte">' + v + '</span>';
+        });
+        html += '<span class="hm-sum num">' + tot(m) + '</span>';
+      });
+      box.innerHTML = html + '</div><p class="hist-note">Punkte je Spieltag, dunkler = mehr. Schwarz hinterlegt: Spieltagssieg.' +
+        (n < days.length ? ' Zu sehen sind die letzten ' + n + ' von ' + days.length + ' Spieltagen, Σ zählt alle.' : '') + '</p>';
+    }
+  }
+
+  function dateLabel(t){ var d = new Date(t); return d.getDate() + '.' + (d.getMonth() + 1) + '.'; }
+  var histResize = null;
+  window.addEventListener('resize', function(){ clearTimeout(histResize); histResize = setTimeout(drawHistory, 150); });
 
   function loadManagerSquad(uid){
     state.managerSquads[uid] = {loading: true};
@@ -3117,6 +3309,21 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   }
 
   function bindBody(){
+    each('#body [data-hview]', function(b){
+      b.addEventListener('click', function(){
+        histView = b.getAttribute('data-hview');
+        try { localStorage.setItem('kp_hist_view', histView); } catch(e){}
+        each('#body [data-hview]', function(x){ x.classList.toggle('on', x === b); });
+        drawHistory();
+      });
+    });
+    var inactBtn = $('inactBtn');
+    if (inactBtn) inactBtn.addEventListener('click', function(){
+      state.hideInactive = !state.hideInactive;
+      try { localStorage.setItem('kp_hide_inactive', state.hideInactive ? '1' : ''); } catch(e){}
+      render();
+    });
+    drawHistory();
     each('#body .row[data-player]', function(r){
       r.addEventListener('click', function(e){
         if (e.target.closest('button, input, label, a')) return;

@@ -367,3 +367,38 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
 .ch-bar.neg{ fill:var(--neg); } .ch-bar.out{ fill:var(--btn-line); }
 .ch.picking .ch-bar:not(.on){ opacity:.35; }
 .ch-hit{ fill:transparent; }
+
+/* Verlauf im Gegner-Tab */
+.hist{ padding:14px 20px 0; }
+.hist-chart{ min-height:168px; }
+.ch-line.other{ stroke:var(--faint); stroke-width:1.5; opacity:.6; }
+.ch-zero{ stroke:var(--faint); stroke-width:1; }
+.hist-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+.hist-chips .chip{ padding:0 12px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hist-note{ margin-top:12px; font-size:12px; line-height:1.5; color:var(--mut); }
+.pl-row{ padding:10px 0; border-top:1px solid var(--line2); }
+.pl-row:first-child{ border-top:0; padding-top:0; }
+.pl-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+.pl-name{ min-width:0; font-size:15px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pl-row.me .pl-name{ font-weight:600; }
+.pl-val{ font-size:15px; font-weight:600; }
+.pl-bar{ position:relative; height:4px; margin:8px 0 6px; border-radius:2px; background:var(--line); }
+.pl-bar i{ position:absolute; top:0; bottom:0; border-radius:2px; }
+.pl-bar i.pos{ background:var(--acc); } .pl-bar i.neg{ background:var(--neg); }
+.pl-bar em{ position:absolute; top:-3px; bottom:-3px; width:1px; margin-left:-.5px; background:var(--faint); }
+.pl-meta{ font-size:12px; color:var(--mut); }
+.hm-grid{ display:grid; gap:4px; align-items:center; }
+.hm-grid > .hm-name{ padding-right:4px; }
+.hm-day{ font-size:12px; color:var(--mut); text-align:center; }
+.hm-day:last-child{ text-align:right; }
+.hm-name{ min-width:0; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hm-name.me{ font-weight:600; }
+.hm{ position:relative; z-index:0; height:30px; display:grid; place-items:center; font-size:11.5px; letter-spacing:-.01em; }
+.hm::before{ content:""; position:absolute; inset:0; z-index:-1; border-radius:6px; background:var(--ink); opacity:var(--a, 0); }
+.hm.win{ color:var(--inv-ink); font-weight:600; }
+.hm.win::before{ opacity:1; }
+.hm-sum{ font-size:13px; font-weight:600; text-align:right; }
+.inact-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:4px 20px 0; border-top:1px solid var(--line2); font-size:12.5px; color:var(--mut); }
+@media (min-width: 1000px){
+  .hist, .inact-row{ padding-left:0; padding-right:0; }
+}
