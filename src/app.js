@@ -35,6 +35,8 @@
   }
   function delta(n){ n = n || 0; return (n >= 0 ? '+' : '−') + short(Math.abs(n)); }
   function negCls(n){ return (n || 0) < 0 ? ' neg' : ''; }
+  // Gewinn/Verlust: Minus rot, Plus gruen, null neutral
+  function signCls(n){ n = n || 0; return n < 0 ? 'neg' : (n > 0 ? 'up' : ''); }
   function escapeHtml(s){
     return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
       return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
@@ -427,14 +429,14 @@
   function squadRow(p, compact){
     var sold = !!state.sell[p.id];
     var sub = [];
-    if (p.gain != null) sub.push('<span class="' + negCls(p.gain).trim() + '">' + delta(p.gain) + ' seit Kauf</span>');
+    if (p.gain != null) sub.push('<span class="' + signCls(p.gain) + '">' + delta(p.gain) + ' seit Kauf</span>');
     if (p.ap != null) sub.push('Ø ' + p.ap);
     if (p.offers) sub.push(p.offers + ' Angebot' + (p.offers > 1 ? 'e' : ''));
     return '<div class="row' + (sold ? ' on sold' : '') + '">' +
       (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
       '<div class="main"><div class="name">' + escapeHtml(p.name) + (p.status ? '<span class="dot" title="Status beachten"></span>' : '') + '</div>' +
         '<div class="sub num">' + sub.join(' · ') + '</div></div>' +
-      '<div class="fig num"><div class="v">' + short(p.mv) + '</div>' + (p.day != null ? '<div class="d' + negCls(p.day) + '">' + delta(p.day) + '</div>' : '') + '</div>' +
+      '<div class="fig num"><div class="v">' + short(p.mv) + '</div>' + (p.day != null ? '<div class="d ' + signCls(p.day) + '">' + delta(p.day) + '</div>' : '') + '</div>' +
       '<button type="button" class="btn' + (sold ? ' on' : '') + '" data-sell="' + p.id + '">' + (sold ? 'Verkauft' : 'Verkaufen') + '</button>' +
     '</div>';
   }
@@ -617,7 +619,7 @@
     return '<div class="opp-squad">' + s.list.map(function(p){
       var g = p.prc != null ? p.mv - p.prc : null;
       return '<div class="opp-row"><span class="pos">' + p.pos + '</span><span class="nm">' + escapeHtml(p.name) + (p.status ? '<span class="dot"></span>' : '') + '</span>' +
-        '<span class="v num">' + short(p.mv) + (g != null ? '<small class="' + negCls(g).trim() + '">' + delta(g) + '</small>' : '') + '</span></div>';
+        '<span class="v num">' + short(p.mv) + (g != null ? '<small class="' + signCls(g) + '">' + delta(g) + '</small>' : '') + '</span></div>';
     }).join('') + '</div>';
   }
 

@@ -60,7 +60,7 @@ button,input,textarea{ font:inherit; color:inherit; }
 button{ background:none; border:0; padding:0; cursor:pointer; }
 [hidden]{ display:none !important; }
 .num{ font-variant-numeric:tabular-nums; }
-.neg{ color:var(--neg); } .acc{ color:var(--acc); } .mut{ color:var(--mut); }
+.neg{ color:var(--neg); } .acc, .up{ color:var(--acc); } .mut{ color:var(--mut); }
 .desk-only{ display:none !important; }
 .is-scriptable .web-only{ display:none !important; }
 
@@ -159,6 +159,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
 .fig .v{ font-size:16px; font-weight:600; }
 .fig .d{ font-size:13px; margin-top:2px; color:var(--mut); }
 .fig .d.neg{ color:var(--neg); }
+.fig .d.up{ color:var(--acc); }
 .btn{ flex:none; min-width:92px; min-height:44px; padding:0 12px; border-radius:10px; border:1px solid var(--btn-line); font-size:13px; font-weight:500; }
 .btn.on{ background:var(--inv-bg); color:var(--inv-ink); border-color:var(--inv-bg); }
 .bidrow{ display:flex; align-items:center; gap:10px; padding:0 20px 12px; background:var(--hi); font-size:13px; color:var(--mut); }
@@ -191,6 +192,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
 .opp-row .v{ text-align:right; font-weight:600; }
 .opp-row .v small{ display:block; font-size:12px; font-weight:400; color:var(--mut); }
 .opp-row .v small.neg{ color:var(--neg); }
+.opp-row .v small.up{ color:var(--acc); }
 
 /* ---------- Tab-Leiste (Handy) ---------- */
 .tabbar{ position:fixed; left:0; right:0; bottom:0; z-index:30; display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); padding:6px 0 max(10px, env(safe-area-inset-bottom)); background:var(--bg); border-top:1px solid var(--line); }
@@ -929,6 +931,8 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   }
   function delta(n){ n = n || 0; return (n >= 0 ? '+' : '−') + short(Math.abs(n)); }
   function negCls(n){ return (n || 0) < 0 ? ' neg' : ''; }
+  // Gewinn/Verlust: Minus rot, Plus gruen, null neutral
+  function signCls(n){ n = n || 0; return n < 0 ? 'neg' : (n > 0 ? 'up' : ''); }
   function escapeHtml(s){
     return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
       return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
@@ -1321,14 +1325,14 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   function squadRow(p, compact){
     var sold = !!state.sell[p.id];
     var sub = [];
-    if (p.gain != null) sub.push('<span class="' + negCls(p.gain).trim() + '">' + delta(p.gain) + ' seit Kauf</span>');
+    if (p.gain != null) sub.push('<span class="' + signCls(p.gain) + '">' + delta(p.gain) + ' seit Kauf</span>');
     if (p.ap != null) sub.push('Ø ' + p.ap);
     if (p.offers) sub.push(p.offers + ' Angebot' + (p.offers > 1 ? 'e' : ''));
     return '<div class="row' + (sold ? ' on sold' : '') + '">' +
       (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
       '<div class="main"><div class="name">' + escapeHtml(p.name) + (p.status ? '<span class="dot" title="Status beachten"></span>' : '') + '</div>' +
         '<div class="sub num">' + sub.join(' · ') + '</div></div>' +
-      '<div class="fig num"><div class="v">' + short(p.mv) + '</div>' + (p.day != null ? '<div class="d' + negCls(p.day) + '">' + delta(p.day) + '</div>' : '') + '</div>' +
+      '<div class="fig num"><div class="v">' + short(p.mv) + '</div>' + (p.day != null ? '<div class="d ' + signCls(p.day) + '">' + delta(p.day) + '</div>' : '') + '</div>' +
       '<button type="button" class="btn' + (sold ? ' on' : '') + '" data-sell="' + p.id + '">' + (sold ? 'Verkauft' : 'Verkaufen') + '</button>' +
     '</div>';
   }
@@ -1511,7 +1515,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     return '<div class="opp-squad">' + s.list.map(function(p){
       var g = p.prc != null ? p.mv - p.prc : null;
       return '<div class="opp-row"><span class="pos">' + p.pos + '</span><span class="nm">' + escapeHtml(p.name) + (p.status ? '<span class="dot"></span>' : '') + '</span>' +
-        '<span class="v num">' + short(p.mv) + (g != null ? '<small class="' + negCls(g).trim() + '">' + delta(g) + '</small>' : '') + '</span></div>';
+        '<span class="v num">' + short(p.mv) + (g != null ? '<small class="' + signCls(g) + '">' + delta(g) + '</small>' : '') + '</span></div>';
     }).join('') + '</div>';
   }
 

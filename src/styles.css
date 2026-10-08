@@ -36,7 +36,7 @@ button,input,textarea{ font:inherit; color:inherit; }
 button{ background:none; border:0; padding:0; cursor:pointer; }
 [hidden]{ display:none !important; }
 .num{ font-variant-numeric:tabular-nums; }
-.neg{ color:var(--neg); } .acc{ color:var(--acc); } .mut{ color:var(--mut); }
+.neg{ color:var(--neg); } .acc, .up{ color:var(--acc); } .mut{ color:var(--mut); }
 .desk-only{ display:none !important; }
 .is-scriptable .web-only{ display:none !important; }
 
@@ -135,6 +135,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
 .fig .v{ font-size:16px; font-weight:600; }
 .fig .d{ font-size:13px; margin-top:2px; color:var(--mut); }
 .fig .d.neg{ color:var(--neg); }
+.fig .d.up{ color:var(--acc); }
 .btn{ flex:none; min-width:92px; min-height:44px; padding:0 12px; border-radius:10px; border:1px solid var(--btn-line); font-size:13px; font-weight:500; }
 .btn.on{ background:var(--inv-bg); color:var(--inv-ink); border-color:var(--inv-bg); }
 .bidrow{ display:flex; align-items:center; gap:10px; padding:0 20px 12px; background:var(--hi); font-size:13px; color:var(--mut); }
@@ -167,6 +168,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
 .opp-row .v{ text-align:right; font-weight:600; }
 .opp-row .v small{ display:block; font-size:12px; font-weight:400; color:var(--mut); }
 .opp-row .v small.neg{ color:var(--neg); }
+.opp-row .v small.up{ color:var(--acc); }
 
 /* ---------- Tab-Leiste (Handy) ---------- */
 .tabbar{ position:fixed; left:0; right:0; bottom:0; z-index:30; display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); padding:6px 0 max(10px, env(safe-area-inset-bottom)); background:var(--bg); border-top:1px solid var(--line); }
