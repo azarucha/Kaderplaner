@@ -1,0 +1,31 @@
+{
+  "_note": "Anonymisierte Kennzahlen einer echten 2.-Liga-Kickbase-Liga am 08.10.2026, 11:58 UTC (5 Manager, Startbudget 75 Mio, nach Spieltag 6). Manager A ist der Token-Inhaber, sein echter Kontostand ist bekannt.",
+  "cpi": "2",
+  "created": "2026-08-03T19:34:14Z",
+  "now": "2026-10-08T11:58:00Z",
+  "startBudget": 75000000,
+  "managerCount": 5,
+  "realBudgetA": -13954834,
+  "realAchievementsA": 2550000,
+  "managers": [
+    {"id": "A", "buys": 543196551, "sells": 419613941, "transfers": 204, "dashboardT": 205,
+     "profits": [1088373, 2774674, 1112706, 3929706, 1211040, 1552078, 1295990, 1414072, 1055527],
+     "autoSales": [{"pi": "1", "trp": 25029776, "estimated": false}],
+     "tp": 3973, "mdw": 0, "tv": 103239095,
+     "mdp": [379, 626, 772, 707, 557, 932], "mpp": [132, 172, 307, 129, 120, 403], "activeDays": 61},
+    {"id": "B", "buys": 808592743, "sells": 694826486, "transfers": 254, "dashboardT": 254,
+     "profits": [1350000, 1413212, 1552910, 1713652, 2463605, 3052730, 3993607, 1837155, 1675237, 1207430, 3445749, 2380531],
+     "autoSales": [], "tp": 4178, "mdw": 2, "tv": 135196275,
+     "mdp": [40, 411, 1145, 604, 911, 1067], "mpp": [164, 98, 243, 111, 201, 264], "activeDays": 62},
+    {"id": "C", "buys": 142624869, "sells": 62484959, "transfers": 41, "dashboardT": 41,
+     "profits": [], "autoSales": [], "tp": 3409, "mdw": 1, "tv": 44251321,
+     "mdp": [453, 633, 610, 638, 508, 567], "mpp": [208, 158, 151, 125, 212, 170], "activeDays": 19},
+    {"id": "D", "buys": 108751713, "sells": 27163318, "transfers": 30, "dashboardT": 30,
+     "profits": [], "autoSales": [], "tp": 3018, "mdw": 1, "tv": 47892422,
+     "mdp": [268, 809, 241, 466, 781, 453], "mpp": [158, 302, 132, 117, 173, 99], "activeDays": 16},
+    {"id": "E", "buys": 488610636, "sells": 400218366, "transfers": 167, "dashboardT": 167,
+     "profits": [1793974, 4219052, 1112113, 2381942, 1190739, 1167944],
+     "autoSales": [], "tp": 4892, "mdw": 2, "tv": 118244028,
+     "mdp": [371, 527, 897, 1245, 969, 883], "mpp": [308, 190, 388, 235, 215, 231], "activeDays": 57}
+  ]
+}

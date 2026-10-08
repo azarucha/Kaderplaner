@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kaderplaner</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kaderplaner">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#14201a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/*__CSS__*/
+</style>
+
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- SETUP -->
+  <section class="setup" id="screen-setup">
+    <div class="brand">
+      <div class="brand-badge">KP</div>
+      <h1>Kaderplaner</h1>
+      <p>Dein Kickbase-Kader auf dem Handy — Kontostand, Marktwerte und Verkaufsentscheidungen auf einen Blick.</p>
+    </div>
+
+    <div>
+      <label class="field-label" for="tokenInput">Kickbase-Token</label>
+      <textarea id="tokenInput" placeholder="eyJhbGciOi..." autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+    </div>
+
+    <div id="setupStatus"></div>
+
+    <button class="btn-primary" id="connectBtn">Verbinden</button>
+
+    <details class="howto">
+      <summary>So bekommst du den Token</summary>
+      <ol>
+        <li><strong>play.kickbase.com/freibier</strong> im Handy- oder Desktop-Browser öffnen und einloggen.</li>
+        <li>Am Desktop: F12 → Tab „Application" (Chrome) bzw. „Storage" (Firefox) → Local Storage → <code>https://play.kickbase.com</code> → Eintrag <code>kb.t</code>.</li>
+        <li>Den Wert (beginnt mit <code>eyJ...</code>) komplett kopieren — nicht abtippen, das erzeugt Tippfehler.</li>
+        <li>Hier oben einfügen und auf „Verbinden" tippen.</li>
+      </ol>
+      <ol style="margin-top:10px;">
+        <li>Der Token läuft nach ein paar Tagen automatisch ab — dann einfach die Schritte wiederholen und neu einfügen.</li>
+      </ol>
+    </details>
+
+    <p class="footer-note">Der Token bleibt nur auf diesem Gerät gespeichert (lokal im Browser) und wird direkt an die Kickbase-API geschickt — sonst nirgendwohin.</p>
+  </section>
+
+  <!-- LEAGUES -->
+  <section id="screen-leagues" hidden>
+    <div class="topbar">
+      <div class="title">
+        <h1>Deine Ligen</h1>
+        <span class="sub" id="tokenName">—</span>
+      </div>
+      <button class="icon-btn" id="logoutBtn" title="Token ändern">⋯</button>
+    </div>
+    <div class="leagues" id="leaguesList">
+      <div class="spinner"></div>
+    </div>
+  </section>
+
+  <!-- SQUAD -->
+  <section id="screen-squad" hidden>
+    <div class="topbar">
+      <button class="icon-btn" id="backBtn">←</button>
+      <div class="title">
+        <h1 id="squadLeagueName">Liga</h1>
+        <span class="sub" id="squadMeta">—</span>
+      </div>
+      <button class="icon-btn" id="refreshBtn" title="Aktualisieren">↻</button>
+    </div>
+
+    <div class="summary-bar">
+      <div class="cell">
+        <span class="lbl">Kontostand</span>
+        <span class="val mono" id="sumBudget">—</span>
+      </div>
+      <div class="cell">
+        <span class="lbl">Verkauf/Kauf</span>
+        <span class="val mono pos" id="sumErlos">€ 0</span>
+      </div>
+      <div class="cell">
+        <span class="lbl">Neu</span>
+        <span class="val mono" id="sumNeu">—</span>
+      </div>
+    </div>
+    <div class="limit-line" id="sumLimit"></div>
+    <div class="limit-line warn" id="sumConstraints" hidden></div>
+
+    <div class="tabbar">
+      <button id="tabKader" class="active">Kader</button>
+      <button id="tabMarkt">Transfermarkt</button>
+      <button id="tabGegner">Gegner</button>
+    </div>
+
+    <div id="squadBody">
+      <div class="spinner"></div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/*__JS__*/
+</script>
+
+</body>
+</html>
