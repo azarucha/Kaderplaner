@@ -282,7 +282,8 @@
         return {
           id: String(p.i || p.pi), name: p.n || p.pn || "Unbekannt", pos: POS_MAP[p.pos] || "–",
           mv: p.mv || 0, gain: p.mvgl, day: p.tfhmvt, ap: p.ap, status: p.st || 0,
-          offers: p.ofc || 0, tid: p.tid, lo: p.lo || 0
+          // lo = Platz in der aktuellen Kickbase-Aufstellung, beginnt bei 0 (Torwart); fehlt = Bank
+          offers: p.ofc || 0, tid: p.tid, lo: p.lo != null ? p.lo : null
         };
       });
       initLineup();
@@ -429,6 +430,13 @@
 
   // ---------- Kader ----------
   function squadRow(p, compact){
+    if (p.bought){
+      // Vorgemerkter Kauf: kommt bei Erfolg dazu, laesst sich nur als Gebot zuruecknehmen
+      return '<div class="row">' + (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
+        '<div class="main"><div class="name">' + escapeHtml(p.name) + '</div><div class="sub num">Gebot ' + short(state.bids[p.id]) + (p.ap != null ? ' · Ø ' + p.ap : '') + '</div></div>' +
+        '<div class="fig num"><div class="v">' + short(p.mv) + '</div></div>' +
+        '<button type="button" class="btn on" data-buy="' + p.id + '">Gemerkt</button></div>';
+    }
     var sold = !!state.sell[p.id];
     var sub = [];
     if (p.gain != null) sub.push('<span class="' + signCls(p.gain) + '">' + delta(p.gain) + ' seit Kauf</span>');
@@ -455,7 +463,14 @@
     var n = f.split('-').map(Number);
     return {TW: 1, ABW: n[0], MF: n[1], ANG: n[2]};
   }
-  function playerById(id){ return state.players.filter(function(p){ return p.id === id; })[0] || null; }
+  // Alle Spieler, die nach Plan im Kader stehen koennen: eigener Kader plus vorgemerkte Kaeufe
+  function lineupPool(){
+    var bought = state.market.filter(function(m){ return state.bids[m.id] != null; }).map(function(m){
+      return {id: m.id, name: m.name, pos: m.pos, mv: m.mv, ap: m.ap, status: m.status, bought: true};
+    });
+    return state.players.concat(bought);
+  }
+  function playerById(id){ return lineupPool().filter(function(p){ return p.id === id; })[0] || null; }
   function emptySlots(f){
     var c = formationCounts(f), s = {};
     POS_ORDER.forEach(function(pos){ s[pos] = new Array(c[pos]).fill(null); });
@@ -479,33 +494,39 @@
     return {formation: f, slots: slots};
   }
   function bestIds(){
-    return state.players.filter(function(p){ return !state.sell[p.id]; })
+    return lineupPool().filter(function(p){ return !state.sell[p.id]; })
       .sort(function(a, b){ return (b.ap || 0) - (a.ap || 0) || b.mv - a.mv; })
       .map(function(p){ return p.id; });
   }
+  // Aktuelle Kickbase-Aufstellung (Feld lo, 0 = Torwart) und ihre Kennung
+  function kickbaseLineup(){
+    var current = state.players.filter(function(p){ return p.lo != null; }).sort(function(a, b){ return a.lo - b.lo; });
+    var c = {TW: 0, ABW: 0, MF: 0, ANG: 0};
+    current.forEach(function(p){ if (c[p.pos] != null) c[p.pos]++; });
+    var f = c.ABW + '-' + c.MF + '-' + c.ANG;
+    var ok = current.length === 11 && c.TW === 1 && FORMATIONS.indexOf(f) >= 0;
+    return { ok: ok, formation: f, ids: current.map(function(p){ return p.id; }), sig: current.map(function(p){ return p.id; }).join(',') };
+  }
   function saveLineup(){
     if (demo || !state.league || !state.lineup) return;
-    try { localStorage.setItem('kp_lineup_' + state.league.i, JSON.stringify(state.lineup)); } catch(e){}
+    var data = {formation: state.lineup.formation, slots: state.lineup.slots, kb: kickbaseLineup().sig};
+    try { localStorage.setItem('kp_lineup_' + state.league.i, JSON.stringify(data)); } catch(e){}
+  }
+  function useKickbaseLineup(){
+    var kb = kickbaseLineup();
+    state.lineup = kb.ok ? buildLineup(kb.formation, kb.ids) : buildLineup('4-4-2', bestIds());
   }
   function initLineup(){
     var stored = null;
     if (!demo){ try { stored = JSON.parse(localStorage.getItem('kp_lineup_' + state.league.i) || 'null'); } catch(e){} }
-    if (stored && FORMATIONS.indexOf(stored.formation) >= 0){
+    // Eigene Planung gilt nur, solange sich die Aufstellung in Kickbase nicht geaendert hat
+    if (stored && FORMATIONS.indexOf(stored.formation) >= 0 && stored.kb === kickbaseLineup().sig){
       var ids = [];
       POS_ORDER.forEach(function(pos){ (stored.slots[pos] || []).forEach(function(id){ if (id) ids.push(id); }); });
       state.lineup = buildLineup(stored.formation, ids);
       return;
     }
-    // Sonst die echte Aufstellung aus Kickbase (Feld lo im Kader), falls sie passt
-    var current = state.players.filter(function(p){ return p.lo > 0; }).sort(function(a, b){ return a.lo - b.lo; });
-    var c = {TW: 0, ABW: 0, MF: 0, ANG: 0};
-    current.forEach(function(p){ if (c[p.pos] != null) c[p.pos]++; });
-    var f = c.ABW + '-' + c.MF + '-' + c.ANG;
-    if (current.length === 11 && c.TW === 1 && FORMATIONS.indexOf(f) >= 0){
-      state.lineup = buildLineup(f, current.map(function(p){ return p.id; }));
-    } else {
-      state.lineup = buildLineup('4-4-2', bestIds());
-    }
+    useKickbaseLineup();
   }
   function setFormation(f){
     var ids = [];
@@ -542,15 +563,17 @@
     }).join('') + '</div>';
 
     html += '<div class="pitch-meta num"><span>' + count + ' / 11 · ≈ ' + Math.round(points).toLocaleString('de-DE') + ' P/Spieltag · ' + short(value) + '</span>' +
-      '<span><button type="button" class="text-btn" id="lineupAuto">Beste Elf</button></span></div>';
+      '<span class="pitch-actions"><button type="button" class="text-btn" id="lineupKb">Aus Kickbase</button>' +
+      '<button type="button" class="text-btn" id="lineupAuto">Beste Elf</button></span></div>';
     if (count < 11) html += '<p class="pitch-hint">' + (11 - count) + ' Platz' + (11 - count > 1 ? 'e' : '') + ' leer: Jeder leere Platz kostet 100 Punkte.</p>';
 
-    var bench = state.players.filter(function(p){ return !placed[p.id]; })
+    var bench = lineupPool().filter(function(p){ return !placed[p.id]; })
       .sort(function(a, b){ return POS_ORDER.indexOf(a.pos) - POS_ORDER.indexOf(b.pos) || b.mv - a.mv; });
-    var benchValue = bench.reduce(function(s, p){ return s + p.mv; }, 0);
-    var allSold = bench.length && bench.every(function(p){ return state.sell[p.id]; });
+    var own = bench.filter(function(p){ return !p.bought; });
+    var benchValue = own.reduce(function(s, p){ return s + p.mv; }, 0);
+    var allSold = own.length && own.every(function(p){ return state.sell[p.id]; });
     html += '<div class="bench-head num"><span><b>Bank</b> · ' + bench.length + ' Spieler · ' + short(benchValue) + '</span>' +
-      (bench.length ? '<button type="button" class="btn' + (allSold ? ' on' : '') + '" id="benchSell">' + (allSold ? 'Alle zurück' : 'Alle verkaufen') + '</button>' : '') + '</div>';
+      (own.length ? '<button type="button" class="btn' + (allSold ? ' on' : '') + '" id="benchSell">' + (allSold ? 'Alle zurück' : 'Alle verkaufen') + '</button>' : '') + '</div>';
     if (!bench.length) html += '<p class="pitch-hint">Alle Spieler stehen auf dem Feld.</p>';
     bench.forEach(function(p){ html += squadRow(p, true); });
     return html;
@@ -558,10 +581,10 @@
 
   function openSlotSheet(pos, i){
     var placed = placedIds(), current = state.lineup.slots[pos][i];
-    var list = state.players.filter(function(p){ return p.pos === pos && !state.sell[p.id]; })
+    var list = lineupPool().filter(function(p){ return p.pos === pos && !state.sell[p.id]; })
       .sort(function(a, b){ return (b.ap || 0) - (a.ap || 0); });
     var html = '<h3>' + POS_LABEL[pos] + ' wählen</h3>' + list.map(function(p){
-      var tag = p.id === current ? 'aufgestellt hier' : (placed[p.id] ? 'tauscht Platz' : 'Bank');
+      var tag = p.id === current ? 'aufgestellt hier' : (placed[p.id] ? 'tauscht Platz' : (p.bought ? 'Gebot' : 'Bank'));
       return '<button type="button" class="item' + (p.id === current ? ' on' : '') + '" data-assign="' + p.id + '">' + escapeHtml(p.name) +
         '<span class="num">Ø ' + (p.ap != null ? p.ap : '–') + ' · ' + short(p.mv) + ' · ' + tag + '</span></button>';
     }).join('');
@@ -575,6 +598,53 @@
     if (clear) clear.addEventListener('click', function(){ state.lineup.slots[pos][i] = null; saveLineup(); closeSheet(); render(); });
   }
 
+  // ---------- Empfehlung: ins Plus kommen ----------
+  var adviceCache = {key: null, value: null};
+  function salesAdvice(){
+    var p = plan();
+    if (p.after >= 0) return null;
+    var sellable = state.players.filter(function(x){ return !state.sell[x.id]; });
+    var key = state.league.i + '|' + p.after + '|' + sellable.map(function(x){ return x.id; }).join(',') + '|' + p.bought.map(function(x){ return x.id; }).join(',');
+    if (adviceCache.key !== key){
+      var entry = function(x){ return {id: x.id, pos: x.pos, mv: x.mv, ap: x.ap, status: x.status}; };
+      // Vorgemerkte Kaeufe kommen bei Erfolg in den Kader und zaehlen fuer die Elf mit
+      adviceCache = {key: key, value: C.recommendSales(sellable.map(entry), -p.after, {fixed: p.bought.map(entry)})};
+    }
+    return adviceCache.value;
+  }
+
+  function adviceHtml(){
+    var a = salesAdvice();
+    if (!a) return '';
+    var p = plan();
+    var html = '<div class="advice"><div class="advice-head"><b>Ins Plus kommen</b><span class="num">es fehlen ' + short(-p.after) + '</span></div>';
+    if (!a.possible){
+      return html + '<p class="advice-note">Selbst der Verkauf des ganzen Kaders reicht nicht. Gebote zurücknehmen hilft.</p></div>';
+    }
+    [['points', 'Punkte schonen'], ['fewest', 'Wenige Verkäufe']].forEach(function(o){
+      var r = a[o[0]];
+      if (!r) return;
+      var names = r.ids.map(function(id){ var x = playerById(id); return x ? escapeHtml(x.name) : ''; }).join(', ');
+      var loss = Math.round(r.loss);
+      html += '<div class="advice-opt"><div class="main">' +
+        '<div class="advice-title">' + o[1] + '</div>' +
+        '<div class="advice-names">' + names + '</div>' +
+        '<div class="advice-meta num">+' + short(r.money) + ' · danach ' + short(p.after + r.money) + ' · ' +
+          (loss <= 0 ? '<span class="up">kein Punkteverlust</span>' : '<span class="neg">−' + loss + ' P/Spieltag</span>') +
+          ' · ' + r.formation + '</div></div>' +
+        '<button type="button" class="btn" data-advice="' + o[0] + '">Übernehmen</button></div>';
+    });
+    return html + '<p class="advice-note">Bewertet nach Punkteschnitt und Verletzungsstatus, Verkauf an Kickbase zum Marktwert. Spieler ohne Punkteschnitt (z. B. Neuzugänge) zählen mit 0.</p></div>';
+  }
+
+  function applyAdvice(kind){
+    var a = salesAdvice(), r = a && a[kind];
+    if (!r) return;
+    r.ids.forEach(function(id){ state.sell[id] = true; });
+    state.lineup = buildLineup(r.formation, bestIds());
+    saveLineup();
+  }
+
   function squadPanel(compact){
     var total = state.players.reduce(function(s, p){ return s + p.mv; }, 0);
     var html = '<section class="panel"><div class="panel-head"><h2>Kader</h2><span class="num">' +
@@ -582,6 +652,7 @@
     if (!state.players.length) return html + '<div class="empty">Keine Spieler im Kader.</div></section>';
     html += '<div class="seg" role="group" aria-label="Ansicht"><button type="button" data-kview="pitch" class="' + (kaderView === 'pitch' ? 'on' : '') + '">Aufstellung</button>' +
       '<button type="button" data-kview="list" class="' + (kaderView === 'list' ? 'on' : '') + '">Liste</button></div>';
+    html += adviceHtml();
     if (kaderView === 'pitch' && state.lineup) return html + lineupHtml(compact) + '</section>';
     POS_ORDER.concat(["–"]).forEach(function(pos){
       var list = state.players.filter(function(p){ return p.pos === pos; });
@@ -795,6 +866,11 @@
         openSlotSheet(s[0], +s[1]);
       });
     });
+    each('#body [data-advice]', function(b){
+      b.addEventListener('click', function(){ applyAdvice(b.getAttribute('data-advice')); render(); });
+    });
+    var kbBtn = $('lineupKb');
+    if (kbBtn) kbBtn.addEventListener('click', function(){ useKickbaseLineup(); saveLineup(); render(); });
     var auto = $('lineupAuto');
     if (auto) auto.addEventListener('click', function(){
       state.lineup = buildLineup(state.lineup.formation, bestIds());
@@ -803,7 +879,7 @@
     var benchSell = $('benchSell');
     if (benchSell) benchSell.addEventListener('click', function(){
       var placed = placedIds();
-      var bench = state.players.filter(function(p){ return !placed[p.id]; });
+      var bench = state.players.filter(function(p){ return !placed[p.id]; });   // nur eigene Spieler, keine Gebote
       var allSold = bench.every(function(p){ return state.sell[p.id]; });
       bench.forEach(function(p){ if (allSold) delete state.sell[p.id]; else state.sell[p.id] = true; });
       render();

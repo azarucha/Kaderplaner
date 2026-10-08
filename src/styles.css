@@ -161,6 +161,18 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
 .slot.empty .sn{ color:var(--faint); }
 .slot .sv{ font-size:11px; color:var(--mut); margin-top:-2px; }
 .pitch-meta{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:6px 20px 0; font-size:13px; color:var(--mut); }
+.pitch-actions{ display:flex; gap:14px; flex:none; }
+.pitch-meta{ flex-wrap:wrap; }
+.advice{ margin:14px 20px 0; padding:14px 16px 12px; border:1px solid var(--line); border-radius:14px; }
+.advice-head{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+.advice-head b{ font-size:15px; font-weight:600; }
+.advice-head span{ font-size:13px; color:var(--neg); }
+.advice-opt{ display:flex; align-items:center; gap:12px; padding:12px 0; border-top:1px solid var(--line2); margin-top:10px; }
+.advice-opt + .advice-opt{ margin-top:0; }
+.advice-title{ font-size:12px; font-weight:600; color:var(--mut); text-transform:uppercase; letter-spacing:.04em; }
+.advice-names{ font-size:15px; font-weight:500; margin-top:2px; }
+.advice-meta{ font-size:13px; color:var(--mut); margin-top:3px; }
+.advice-note{ font-size:12px; line-height:1.5; color:var(--mut); padding-top:4px; }
 .pitch-hint{ padding:2px 20px 0; font-size:13px; color:var(--warn); }
 .bench-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:20px 20px 8px; font-size:13px; color:var(--mut); }
 .bench-head b{ color:var(--ink); font-size:15px; font-weight:600; }
@@ -264,7 +276,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   .cols .rank-power{ font-size:15px; }
   .panel-head, .panel-intro, .group, .subhead, .row, .rank, .check, .calc, .bidrow,
   .formations, .pitch-meta, .pitch-hint, .bench-head{ padding-left:0; padding-right:0; }
-  .seg, .pitch{ margin-left:0; margin-right:0; }
+  .seg, .pitch, .advice{ margin-left:0; margin-right:0; }
   .cols .seg{ margin-top:12px; }
   .cols .slot{ width:58px; }
   .cols .slot .sn{ max-width:58px; }

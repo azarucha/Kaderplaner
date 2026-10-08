@@ -211,7 +211,117 @@
     };
   }
 
+  // ---------- Verkaufsempfehlung ----------
+  // Ziel: mit Verkaeufen an Kickbase (zum Marktwert) mindestens `need` Euro
+  // einnehmen und dabei moeglichst wenige erwartete Punkte der besten Elf verlieren.
+  var FORMATIONS = ['3-4-3', '3-5-2', '3-6-1', '4-2-4', '4-3-3', '4-4-2', '4-5-1', '5-2-3', '5-3-2', '5-4-1'];
+  var EMPTY_SLOT = -100;   // Kickbase zieht fuer jeden leeren Aufstellungsplatz 100 Punkte ab
+
+  // Statuscodes: 1 verletzt, 2 angeschlagen, 4 Reha, 16 Sperre, 256 freigestellt
+  function availability(status){
+    status = status || 0;
+    if (status & (1 | 4 | 16 | 256)) return 0;
+    if (status & 2) return 0.6;
+    return 1;
+  }
+  function expectedPoints(p){ return (p.ap || 0) * availability(p.status); }
+
+  function formationCounts(f){
+    var n = f.split('-').map(Number);
+    return {TW: 1, ABW: n[0], MF: n[1], ANG: n[2]};
+  }
+
+  // Beste Elf ueber alle Formationen: Summe der erwarteten Punkte, leere Plaetze -100.
+  function bestEleven(players){
+    var byPos = {TW: [], ABW: [], MF: [], ANG: []};
+    players.forEach(function(p){ if (byPos[p.pos]) byPos[p.pos].push(p.pts != null ? p.pts : expectedPoints(p)); });
+    Object.keys(byPos).forEach(function(k){ byPos[k].sort(function(a, b){ return b - a; }); });
+    var best = -Infinity, formation = null;
+    FORMATIONS.forEach(function(f){
+      var c = formationCounts(f), s = 0;
+      Object.keys(c).forEach(function(pos){
+        for (var k = 0; k < c[pos]; k++) s += k < byPos[pos].length ? byPos[pos][k] : EMPTY_SLOT;
+      });
+      if (s > best){ best = s; formation = f; }
+    });
+    return {points: best, formation: formation};
+  }
+
+  // players: [{id, pos, mv, ap, status}] (nur verkaufbare). need: fehlender Betrag.
+  // Liefert zwei Vorschlaege: "points" (wenigste Punkte verloren) und "fewest"
+  // (wenigste Verkaeufe, dann wenigste Punkte). Bei mehr als maxN Spielern
+  // werden nur die maxN wertvollsten als Kandidaten betrachtet.
+  function recommendSales(players, need, opts){
+    opts = opts || {};
+    var maxN = opts.maxN || 20;
+    var toEntry = function(p){ return {id: p.id, pos: p.pos, mv: p.mv || 0, pts: expectedPoints(p)}; };
+    var sellable = players.map(toEntry);
+    // opts.fixed: Spieler, die sicher dazukommen (z. B. vorgemerkte Kaeufe) - zaehlen fuer die Elf, sind aber nicht verkaufbar
+    var all = sellable.concat((opts.fixed || []).map(toEntry));
+    var base = bestEleven(all);
+    var total = sellable.reduce(function(s, p){ return s + p.mv; }, 0);
+    if (need <= 0) return {base: base, need: need, possible: true, points: null, fewest: null};
+    if (total < need) return {base: base, need: need, possible: false, total: total, points: null, fewest: null};
+
+    var cand = sellable.slice().sort(function(a, b){ return b.mv - a.mv; }).slice(0, maxN);
+    var n = cand.length, size = 1 << n;
+
+    // Spieler je Position nach Punkten sortiert (Kandidaten mit Index, feste ohne)
+    var POS = ['TW', 'ABW', 'MF', 'ANG'], lists = {};
+    POS.forEach(function(pos){
+      lists[pos] = all.filter(function(p){ return p.pos === pos; })
+        .map(function(p){ return {pts: p.pts, bit: cand.indexOf(p)}; })
+        .sort(function(a, b){ return b.pts - a.pts; });
+    });
+    var counts = FORMATIONS.map(formationCounts);
+    var money = new Float64Array(size), best = null, fewest = null;
+    var top = {TW: [0, 0, 0, 0, 0, 0, 0], ABW: [0, 0, 0, 0, 0, 0, 0], MF: [0, 0, 0, 0, 0, 0, 0], ANG: [0, 0, 0, 0, 0, 0, 0]};
+
+    for (var mask = 1; mask < size; mask++){
+      var low = mask & -mask, bit = 31 - Math.clz32(low);
+      money[mask] = money[mask ^ low] + cand[bit].mv;
+      if (money[mask] < need) continue;
+
+      // Praefixsummen der besten verbleibenden Spieler je Position (bis 6 Plaetze)
+      for (var q = 0; q < 4; q++){
+        var pos = POS[q], list = lists[pos], arr = top[pos], k = 0, sum = 0;
+        for (var j = 0; j < list.length && k < 6; j++){
+          var b = list[j].bit;
+          if (b >= 0 && (mask >> b) & 1) continue;
+          sum += list[j].pts; k++; arr[k] = sum;
+        }
+        for (; k < 6; k++){ sum += EMPTY_SLOT; arr[k + 1] = sum; }
+      }
+      var pts = -Infinity, form = null;
+      for (var fi = 0; fi < counts.length; fi++){
+        var c = counts[fi];
+        var s = top.TW[c.TW] + top.ABW[c.ABW] + top.MF[c.MF] + top.ANG[c.ANG];
+        if (s > pts){ pts = s; form = FORMATIONS[fi]; }
+      }
+      var cnt = 0;
+      for (var m = mask; m; m &= m - 1) cnt++;
+      var cand1 = {mask: mask, money: money[mask], points: pts, count: cnt, formation: form};
+      if (!best || pts > best.points || (pts === best.points && (cnt < best.count || (cnt === best.count && cand1.money > best.money)))) best = cand1;
+      if (!fewest || cnt < fewest.count || (cnt === fewest.count && (pts > fewest.points || (pts === fewest.points && cand1.money > fewest.money)))) fewest = cand1;
+    }
+
+    function describe(r){
+      if (!r) return null;
+      var ids = [];
+      for (var b = 0; b < n; b++) if ((r.mask >> b) & 1) ids.push(cand[b].id);
+      return {ids: ids, money: r.money, points: r.points, loss: base.points - r.points, formation: r.formation, count: r.count};
+    }
+    var out = {base: base, need: need, possible: !!best, points: describe(best), fewest: describe(fewest)};
+    if (out.points && out.fewest && out.points.ids.join() === out.fewest.ids.join()) out.fewest = null;
+    return out;
+  }
+
   return {
+    FORMATIONS: FORMATIONS,
+    availability: availability,
+    expectedPoints: expectedPoints,
+    bestEleven: bestEleven,
+    recommendSales: recommendSales,
     MINUS_RATE: MINUS_RATE,
     maxNegative: maxNegative,
     bidRoom: bidRoom,

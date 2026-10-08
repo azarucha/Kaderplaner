@@ -51,7 +51,7 @@
 
   var market = players.slice(cursor, cursor + 14).map(function(p, i){
     var offer = i % 5 === 4 ? managers[1 + (i % 4)] : null;
-    var o = {i: p.i, fn: p.fn, n: p.n, pos: p.pos, tid: p.tid, mv: p.mv, st: p.st, ofc: Math.floor(rnd() * 3),
+    var o = {i: p.i, fn: p.fn, n: p.n, pos: p.pos, tid: p.tid, mv: p.mv, st: p.st, ap: p.ap, ofc: Math.floor(rnd() * 3),
       prc: offer ? round(p.mv * 1.2, 10000) : p.mv, mvt: rnd() < 0.5 ? 1 : 2};
     if (offer) o.u = {i: offer.i, n: offer.n}; else o.exs = Math.round(600 + rnd() * 80000);
     return o;

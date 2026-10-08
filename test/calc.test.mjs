@@ -79,6 +79,64 @@ test('Erfolge: Manager A ergibt exakt die echten 2,55 Mio', () => {
   assert.equal(C.achievementTotal(counts, C.defaultRewards('2')), fx.realAchievementsA);
 });
 
+// Kader nach dem Muster einer echten 2.-Liga-Mannschaft (Namen erfunden)
+const SQUAD = [
+  { id: 'tw1', pos: 'TW', mv: 6.7e6, ap: 119 }, { id: 'tw2', pos: 'TW', mv: 0.9e6, ap: 40 },
+  { id: 'a1', pos: 'ABW', mv: 13.8e6, ap: 127 }, { id: 'a2', pos: 'ABW', mv: 12.2e6, ap: 119 },
+  { id: 'a3', pos: 'ABW', mv: 9.6e6, ap: 104 }, { id: 'a4', pos: 'ABW', mv: 6.6e6, ap: 78 },
+  { id: 'a5', pos: 'ABW', mv: 4.1e6, ap: 70 }, { id: 'a6', pos: 'ABW', mv: 2.0e6, ap: 50 },
+  { id: 'a7', pos: 'ABW', mv: 1.5e6, ap: 30 },
+  { id: 'm1', pos: 'MF', mv: 12.5e6, ap: 159 }, { id: 'm2', pos: 'MF', mv: 12.6e6, ap: 127 },
+  { id: 'm3', pos: 'MF', mv: 2.9e6, ap: 44 }, { id: 'm4', pos: 'MF', mv: 0.25e6, ap: 20 },
+  { id: 's1', pos: 'ANG', mv: 9.6e6, ap: 104 }, { id: 's2', pos: 'ANG', mv: 12.6e6, ap: 100, status: 1 },
+  { id: 's3', pos: 'ANG', mv: 3.0e6, ap: 60 }
+];
+
+test('Beste Elf: Formation und Punkte, verletzte Spieler zaehlen nicht', () => {
+  const r = C.bestEleven(SQUAD);
+  // 5-3-2 nutzt die Abwehrtiefe; der verletzte Stuermer s2 zaehlt 0, deshalb
+  // spielt s3 (60 P) statt des vierten Mittelfeldspielers (20 P)
+  assert.equal(r.formation, '5-3-2');
+  assert.equal(r.points, 119 + (127 + 119 + 104 + 78 + 70) + (159 + 127 + 44) + (104 + 60));
+  // fehlende Spieler kosten je 100 Punkte
+  assert.equal(C.bestEleven([{ pos: 'TW', ap: 100 }]).points, 100 - 1000);
+});
+
+test('Verkaufsempfehlung: erst Bank und Verletzte, Betrag reicht, Ergebnis optimal', () => {
+  const need = 14e6;
+  const r = C.recommendSales(SQUAD, need);
+  assert.ok(r.possible);
+  assert.ok(r.points.money >= need);
+  // Der verletzte Stuermer (12,6 Mio, 0 erwartete Punkte) ist der offensichtliche Verkauf
+  assert.ok(r.points.ids.includes('s2'));
+  // Gegenprobe per Brute Force: keine Kombination verliert weniger Punkte
+  const ids = SQUAD.map(p => p.id);
+  let bestLoss = Infinity;
+  for (let mask = 1; mask < 1 << ids.length; mask++){
+    const sold = SQUAD.filter((p, i) => (mask >> i) & 1);
+    if (sold.reduce((s, p) => s + p.mv, 0) < need) continue;
+    const left = SQUAD.filter((p, i) => !((mask >> i) & 1));
+    bestLoss = Math.min(bestLoss, r.base.points - C.bestEleven(left).points);
+  }
+  assert.equal(r.points.loss, bestLoss);
+  // "fewest" verkauft hoechstens so viele Spieler wie "points"
+  if (r.fewest) assert.ok(r.fewest.count <= r.points.count);
+});
+
+test('Verkaufsempfehlung: vorgemerkte Kaeufe fuellen die Elf, sind aber nicht verkaufbar', () => {
+  const buy = { id: 'neu', pos: 'ANG', mv: 20e6, ap: 150 };
+  const r = C.recommendSales(SQUAD, 14e6, { fixed: [buy] });
+  assert.ok(!r.points.ids.includes('neu'));
+  // Mit dem neuen Stuermer wird der bisherige Stuermer s1 entbehrlicher
+  const without = C.recommendSales(SQUAD, 14e6);
+  assert.ok(r.points.loss <= without.points.loss);
+});
+
+test('Verkaufsempfehlung: unmoeglich, wenn der ganze Kader nicht reicht', () => {
+  const r = C.recommendSales(SQUAD.slice(0, 2), 50e6);
+  assert.equal(r.possible, false);
+});
+
 test('Pruefstein: Schaetzung fuer Manager A trifft den echten Kontostand', () => {
   const est = estimate(fx.managers[0]);
   assert.ok(Math.abs(est.mid - fx.realBudgetA) <= 60000, `Abweichung ${est.mid - fx.realBudgetA}`);
