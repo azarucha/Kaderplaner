@@ -244,5 +244,28 @@
     }
   }
 
-  root.KBData = { createClient: createClient, pool: pool, estimateAll: estimateAll, fetchTransfers: fetchTransfers };
+  // Form und Einsatzquote fuer eine Liste von Spieler-IDs. Nimmt pro Spieler den
+  // Eintrag der neuesten Saison (bei mehreren Wettbewerben den mit den meisten
+  // Spieltagen). Der letzte gespielte Spieltag ergibt sich aus allen Spielern.
+  function fetchForms(client, cpi, ids){
+    return pool(ids, 6, function(id){
+      return client.get("/competitions/" + cpi + "/players/" + id + "/performance").then(function(d){
+        var seasons = (d && d.it) || [], cur = null;
+        seasons.forEach(function(s){
+          if (!cur || String(s.ti) > String(cur.ti) || (s.ti === cur.ti && (s.ph || []).length > (cur.ph || []).length)) cur = s;
+        });
+        return {id: id, ph: (cur && cur.ph) || []};
+      }).catch(function(){ return {id: id, ph: null}; });
+    }).then(function(list){
+      var lastDay = 0;
+      list.forEach(function(x){
+        (x.ph || []).forEach(function(h){ if (h.day > lastDay && (h.p != null || h.mp)) lastDay = h.day; });
+      });
+      var out = {};
+      list.forEach(function(x){ if (x.ph) out[x.id] = C.formFromPerformance(x.ph, lastDay); });
+      return out;
+    });
+  }
+
+  root.KBData = { createClient: createClient, pool: pool, estimateAll: estimateAll, fetchTransfers: fetchTransfers, fetchForms: fetchForms };
 })(typeof self !== 'undefined' ? self : this);

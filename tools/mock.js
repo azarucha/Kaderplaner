@@ -95,7 +95,12 @@
     [/^\/leagues\/\d+\/users\/\d+\/teamcenter$/, function(m, q){
       var d = +q.get("dayNumber"); return {us: managers.map(function(x){ return {i: x.i, unm: x.n, mdp: mdp(x.i, d), lp: lineup(x.i)}; })}; }],
     [/^\/competitions\/\d+\/players\/(\d+)\/performance$/, function(m){
-      var p = byId[m[1]] || {pts: {}}; var ph = []; for (var d = 1; d <= 6; d++) ph.push({day: d, p: p.pts[d]});
+      // wie die echte API: Startelf st 5, eingewechselt st 3, ohne Einsatz "0'"
+      var p = byId[m[1]] || {pts: {}}; var ph = [];
+      for (var d = 1; d <= 6; d++){
+        var pt = p.pts[d] || 0, sub = pt > 0 && pt < 40;
+        ph.push(pt > 0 ? {day: d, p: pt, mp: sub ? "25'" : "90'", st: sub ? 3 : 5} : {day: d, p: 0, mp: "0'"});
+      }
       return {it: [{ti: "2026/2027", ph: ph}]}; }]
   ];
 

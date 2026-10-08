@@ -229,7 +229,57 @@
     if (status & 2) return 0.9;      // angeschlagen
     return 1;
   }
-  function expectedPoints(p){ return (p.ap || 0) * availability(p.status); }
+  // Erwartete Punkte pro Spieltag. Mit Leistungsdaten (p.form) kombiniert das Modell
+  //   Einsatzchance = 60 % letzte 5 Spieltage + 40 % ganze Saison
+  //   Qualitaet     = je halb Saisonschnitt pro Einsatz (ap) und Schnitt der letzten Einsaetze
+  // und multipliziert mit der Verfuegbarkeit. Ohne Leistungsdaten: ap x Verfuegbarkeit.
+  function expectedPoints(p){
+    var avail = availability(p.status), f = p.form;
+    if (!f || !f.teamDays || f.teamDays < 2) return (p.ap || 0) * avail;
+    var chance = 0.6 * (f.recentApps / Math.max(1, f.recentDays)) + 0.4 * (f.apps / f.teamDays);
+    var recentQ = f.recentApps ? f.recentPoints / f.recentApps : null;
+    var quality = p.ap != null
+      ? (recentQ != null ? 0.5 * p.ap + 0.5 * recentQ : p.ap)
+      : (recentQ != null ? recentQ : 0);
+    return quality * chance * avail;
+  }
+
+  // Leistungsdaten aus /competitions/{cpi}/players/{id}/performance (Liste ph der
+  // aktuellen Saison mit day, p, mp, st) fuer die Spieltage 1..lastDay.
+  // st 5 = Startelf, 3 = eingewechselt; ohne st zaehlt ein Eintrag mit Minuten > 0.
+  function formFromPerformance(ph, lastDay, window){
+    window = window || 5;
+    var byDay = {};
+    (ph || []).forEach(function(h){ if (h && h.day != null) byDay[h.day] = h; });
+    var appeared = function(h){
+      if (!h) return false;
+      if (h.st === 5 || h.st === 3) return true;
+      return parseInt(String(h.mp || '0'), 10) > 0;
+    };
+    var f = {teamDays: lastDay || 0, apps: 0, starts: 0, recentDays: 0, recentApps: 0, recentStarts: 0, recentPoints: 0, last: []};
+    for (var d = 1; d <= lastDay; d++){
+      var h = byDay[d], on = appeared(h), recent = d > lastDay - window;
+      if (on){ f.apps++; if (h.st === 5) f.starts++; }
+      if (recent){
+        f.recentDays++;
+        f.last.push(on ? (h.p || 0) : null);
+        if (on){ f.recentApps++; f.recentPoints += h.p || 0; if (h.st === 5) f.recentStarts++; }
+      }
+    }
+    return f;
+  }
+
+  // Lexikografischer Vergleich: hoehere Punkte, niedrigerer Trend (fallende Werte
+  // lieber verkaufen), weniger Verkaeufe, mehr Geld - je nach Reihenfolge in keys.
+  function better(a, b, keys){
+    for (var i = 0; i < keys.length; i++){
+      var k = keys[i], x = a[k], y = b[k];
+      if (x === y) continue;
+      var higherWins = k === 'rp' || k === 'money';
+      return higherWins ? x > y : x < y;
+    }
+    return false;
+  }
 
   function formationCounts(f){
     var n = f.split('-').map(Number);
@@ -259,7 +309,8 @@
   function recommendSales(players, need, opts){
     opts = opts || {};
     var maxN = opts.maxN || 20;
-    var toEntry = function(p){ return {id: p.id, pos: p.pos, mv: p.mv || 0, pts: expectedPoints(p)}; };
+    // trend: Marktwertaenderung in Euro pro Tag (fallend = negativ)
+    var toEntry = function(p){ return {id: p.id, pos: p.pos, mv: p.mv || 0, pts: expectedPoints(p), trend: p.trend || 0}; };
     var sellable = players.map(toEntry);
     // opts.fixed: Spieler, die sicher dazukommen (z. B. vorgemerkte Kaeufe) - zaehlen fuer die Elf, sind aber nicht verkaufbar
     var all = sellable.concat((opts.fixed || []).map(toEntry));
@@ -279,12 +330,13 @@
         .sort(function(a, b){ return b.pts - a.pts; });
     });
     var counts = FORMATIONS.map(formationCounts);
-    var money = new Float64Array(size), best = null, fewest = null;
+    var money = new Float64Array(size), trend = new Float64Array(size), best = null, fewest = null;
     var top = {TW: [0, 0, 0, 0, 0, 0, 0], ABW: [0, 0, 0, 0, 0, 0, 0], MF: [0, 0, 0, 0, 0, 0, 0], ANG: [0, 0, 0, 0, 0, 0, 0]};
 
     for (var mask = 1; mask < size; mask++){
       var low = mask & -mask, bit = 31 - Math.clz32(low);
       money[mask] = money[mask ^ low] + cand[bit].mv;
+      trend[mask] = trend[mask ^ low] + cand[bit].trend;
       if (money[mask] < need) continue;
 
       // Praefixsummen der besten verbleibenden Spieler je Position (bis 6 Plaetze)
@@ -305,16 +357,18 @@
       }
       var cnt = 0;
       for (var m = mask; m; m &= m - 1) cnt++;
-      var cand1 = {mask: mask, money: money[mask], points: pts, count: cnt, formation: form};
-      if (!best || pts > best.points || (pts === best.points && (cnt < best.count || (cnt === best.count && cand1.money > best.money)))) best = cand1;
-      if (!fewest || cnt < fewest.count || (cnt === fewest.count && (pts > fewest.points || (pts === fewest.points && cand1.money > fewest.money)))) fewest = cand1;
+      // Punkte auf ganze Punkte gerundet; bei Gleichstand lieber fallende als steigende
+      // Marktwerte verkaufen, dann weniger Verkaeufe, dann mehr Geld.
+      var cand1 = {mask: mask, money: money[mask], points: pts, rp: Math.round(pts), trend: trend[mask], count: cnt, formation: form};
+      if (!best || better(cand1, best, ['rp', 'trend', 'count', 'money'])) best = cand1;
+      if (!fewest || better(cand1, fewest, ['count', 'rp', 'trend', 'money'])) fewest = cand1;
     }
 
     function describe(r){
       if (!r) return null;
       var ids = [];
       for (var b = 0; b < n; b++) if ((r.mask >> b) & 1) ids.push(cand[b].id);
-      return {ids: ids, money: r.money, points: r.points, loss: base.points - r.points, formation: r.formation, count: r.count};
+      return {ids: ids, money: r.money, points: r.points, loss: base.points - r.points, formation: r.formation, count: r.count, trend: r.trend};
     }
     var out = {base: base, need: need, possible: !!best, points: describe(best), fewest: describe(fewest)};
     if (out.points && out.fewest && out.points.ids.join() === out.fewest.ids.join()) out.fewest = null;
@@ -325,6 +379,7 @@
     FORMATIONS: FORMATIONS,
     availability: availability,
     expectedPoints: expectedPoints,
+    formFromPerformance: formFromPerformance,
     bestEleven: bestEleven,
     recommendSales: recommendSales,
     MINUS_RATE: MINUS_RATE,

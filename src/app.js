@@ -118,7 +118,7 @@
       budget:0, players:[], sell:{}, market:[], bids:{},
       managers:[], overview:null, clubNames:{}, nextKickoff:null, matchday:null,
       estimates:null, estLoading:false, estError:false, estProgress:"", showCalc:false,
-      openManager:null, managerSquads:{}, tab:null, loading:false, lineup:null
+      openManager:null, managerSquads:{}, tab:null, loading:false, lineup:null, forms:null
     };
   }
   var state = initialState();
@@ -318,6 +318,7 @@
       state.loading = false;
       els.refreshBtn.classList.remove('spin');
       render();
+      loadForms();
     }).catch(function(err){
       state.loading = false;
       els.refreshBtn.classList.remove('spin');
@@ -441,6 +442,8 @@
     var sub = [];
     if (p.gain != null) sub.push('<span class="' + signCls(p.gain) + '">' + delta(p.gain) + ' seit Kauf</span>');
     if (p.ap != null) sub.push('Ø ' + p.ap);
+    var f = formOf(p);
+    if (f && f.recentDays) sub.push(f.recentStarts + '/' + f.recentDays + ' Startelf');
     if (p.offers) sub.push(p.offers + ' Angebot' + (p.offers > 1 ? 'e' : ''));
     return '<div class="row' + (sold ? ' on sold' : '') + '">' +
       (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
@@ -463,6 +466,28 @@
     var n = f.split('-').map(Number);
     return {TW: 1, ABW: n[0], MF: n[1], ANG: n[2]};
   }
+  // Erwartete Punkte pro Spieltag: Punkteschnitt, Form der letzten 5 Spieltage,
+  // Einsatzquote und Verfuegbarkeit (siehe KBCalc.expectedPoints)
+  function formOf(p){ return state.forms ? state.forms[p.id] : null; }
+  function expected(p){ return C.expectedPoints({ap: p.ap, status: p.status, form: formOf(p)}); }
+  function calcEntry(p){
+    // trend: Marktwertaenderung der letzten 24 h (eigener Kader), fuer die Gleichstandsregel
+    return {id: p.id, pos: p.pos, mv: p.mv, ap: p.ap, status: p.status, form: formOf(p), trend: p.day || 0};
+  }
+
+  function loadForms(){
+    var l = state.league;
+    var ids = state.players.map(function(p){ return p.id; }).concat(state.market.map(function(m){ return m.id; }));
+    if (!ids.length) return;
+    KBData.fetchForms(client, l.cpi || 1, ids).then(function(forms){
+      if (state.league !== l) return;
+      state.forms = forms;
+      // Die "Beste Elf" haengt jetzt von Form und Einsatzquote ab: Empfehlung neu rechnen
+      adviceCache = {key: null, value: null};
+      render();
+    }).catch(function(){});
+  }
+
   // Alle Spieler, die nach Plan im Kader stehen koennen: eigener Kader plus vorgemerkte Kaeufe
   function lineupPool(){
     var bought = state.market.filter(function(m){ return state.bids[m.id] != null; }).map(function(m){
@@ -495,7 +520,7 @@
   }
   function bestIds(){
     return lineupPool().filter(function(p){ return !state.sell[p.id]; })
-      .sort(function(a, b){ return (b.ap || 0) - (a.ap || 0) || b.mv - a.mv; })
+      .sort(function(a, b){ return expected(b) - expected(a) || b.mv - a.mv; })
       .map(function(p){ return p.id; });
   }
   // Aktuelle Kickbase-Aufstellung (Feld lo, 0 = Torwart) und ihre Kennung
@@ -556,8 +581,9 @@
       return '<div class="line">' + lu.slots[pos].map(function(id, i){
         var p = id && playerById(id);
         if (!p) return '<button type="button" class="slot empty" data-slot="' + pos + ':' + i + '" aria-label="' + POS_LABEL[pos] + ' wählen"><span class="av">+</span><span class="sn">' + pos + '</span></button>';
-        count++; points += p.ap || 0; value += p.mv;
-        return '<button type="button" class="slot" data-slot="' + pos + ':' + i + '"><span class="av num">' + (p.ap != null ? p.ap : '–') + '</span>' +
+        var e = expected(p);
+        count++; points += e; value += p.mv;
+        return '<button type="button" class="slot" data-slot="' + pos + ':' + i + '"><span class="av num" title="erwartete Punkte pro Spieltag">' + (p.ap != null || formOf(p) ? Math.round(e) : '–') + '</span>' +
           '<span class="sn">' + escapeHtml(p.name) + '</span><span class="sv num">' + short(p.mv) + '</span></button>';
       }).join('') + '</div>';
     }).join('') + '</div>';
@@ -582,11 +608,12 @@
   function openSlotSheet(pos, i){
     var placed = placedIds(), current = state.lineup.slots[pos][i];
     var list = lineupPool().filter(function(p){ return p.pos === pos && !state.sell[p.id]; })
-      .sort(function(a, b){ return (b.ap || 0) - (a.ap || 0); });
+      .sort(function(a, b){ return expected(b) - expected(a); });
     var html = '<h3>' + POS_LABEL[pos] + ' wählen</h3>' + list.map(function(p){
+      var f = formOf(p);
       var tag = p.id === current ? 'aufgestellt hier' : (placed[p.id] ? 'tauscht Platz' : (p.bought ? 'Gebot' : 'Bank'));
       return '<button type="button" class="item' + (p.id === current ? ' on' : '') + '" data-assign="' + p.id + '">' + escapeHtml(p.name) +
-        '<span class="num">Ø ' + (p.ap != null ? p.ap : '–') + ' · ' + short(p.mv) + ' · ' + tag + '</span></button>';
+        '<span class="num">≈ ' + Math.round(expected(p)) + ' P' + (f ? ' · ' + f.recentStarts + '/' + f.recentDays + ' Startelf' : '') + ' · ' + short(p.mv) + ' · ' + tag + '</span></button>';
     }).join('');
     if (!list.length) html += '<p class="sheet-note">Kein ' + POS_LABEL[pos] + ' im Kader (verkaufte Spieler zählen nicht).</p>';
     if (current) html += '<button type="button" class="item danger" id="slotClear">Platz leeren</button>';
@@ -604,9 +631,9 @@
     var p = plan();
     if (p.after >= 0) return null;
     var sellable = state.players.filter(function(x){ return !state.sell[x.id]; });
-    var key = state.league.i + '|' + p.after + '|' + sellable.map(function(x){ return x.id; }).join(',') + '|' + p.bought.map(function(x){ return x.id; }).join(',');
+    var key = state.league.i + '|' + p.after + '|' + sellable.map(function(x){ return x.id; }).join(',') + '|' + p.bought.map(function(x){ return x.id; }).join(',') + '|' + !!state.forms;
     if (adviceCache.key !== key){
-      var entry = function(x){ return {id: x.id, pos: x.pos, mv: x.mv, ap: x.ap, status: x.status}; };
+      var entry = calcEntry;
       // Vorgemerkte Kaeufe kommen bei Erfolg in den Kader und zaehlen fuer die Elf mit
       adviceCache = {key: key, value: C.recommendSales(sellable.map(entry), -p.after, {fixed: p.bought.map(entry)})};
     }
@@ -634,7 +661,7 @@
           ' · ' + r.formation + '</div></div>' +
         '<button type="button" class="btn" data-advice="' + o[0] + '">Übernehmen</button></div>';
     });
-    return html + '<p class="advice-note">Bewertet nach Punkteschnitt, Ausfälle mit Abschlag (angeschlagen 90 %, verletzt 40 %). Verkauf an Kickbase zum Marktwert. Spieler ohne Punkteschnitt (z. B. Neuzugänge) zählen mit 0.</p></div>';
+    return html + '<p class="advice-note">Erwartete Punkte aus Punkteschnitt, Form und Einsatzquote der letzten 5 Spieltage. Bei Gleichstand gehen fallende Marktwerte zuerst. Ausfälle mit Abschlag (angeschlagen 90 %, verletzt 40 %). Verkauf an Kickbase zum Marktwert. Spieler ohne Punkteschnitt (z. B. Neuzugänge) zählen mit 0.</p></div>';
   }
 
   function applyAdvice(kind){

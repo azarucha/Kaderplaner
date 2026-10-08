@@ -27,8 +27,10 @@ mitbieten kann.
   lässt sich mit einem Tipp komplett zum Verkauf vormerken.
 - **Ins Plus kommen:** Steht das Konto nach Plan im Minus, schlägt die App vor, wen
   du verkaufen solltest. Sie prüft alle Kombinationen und wählt die, die genug Geld
-  bringt und die wenigsten erwarteten Punkte der besten Elf kostet (Punkteschnitt,
-  verletzte und gesperrte Spieler zählen 0, leere Plätze −100).
+  bringt und die wenigsten erwarteten Punkte der besten Elf kostet. Erwartete Punkte
+  = Qualität (Punkteschnitt und Form der letzten Einsätze) × Einsatzchance (letzte 5
+  Spieltage und Saison) × Verfügbarkeit; leere Plätze kosten −100. Bei Gleichstand
+  werden Spieler mit fallendem Marktwert zuerst verkauft.
 - **Kader planen:** Spieler zum Verkauf markieren, Marktspieler mit eigenem Gebot
   vormerken. Kontostand, Spielraum bis zur 33%-Grenze, Kader- und Vereinslimit
   rechnen sofort mit.
