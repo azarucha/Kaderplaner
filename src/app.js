@@ -431,7 +431,7 @@
   }
 
   // ---------- Kader ----------
-  function squadRow(p, compact){
+  function squadRow(p, compact, withPoints){
     if (p.bought){
       // Vorgemerkter Kauf: kommt bei Erfolg dazu, laesst sich nur als Gebot zuruecknehmen
       return '<div class="row' + (compact ? '' : ' np') + '">' + (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
@@ -441,6 +441,7 @@
     }
     var sold = !!state.sell[p.id];
     var sub = [];
+    if (withPoints && (p.ap != null || formOf(p))) sub.push('≈ ' + Math.round(expected(p)) + ' P');
     if (p.gain != null) sub.push('<span class="' + signCls(p.gain) + '">' + delta(p.gain) + ' seit Kauf</span>');
     if (p.ap != null) sub.push('Ø ' + p.ap);
     var f = formOf(p);
@@ -551,9 +552,23 @@
       var ids = [];
       POS_ORDER.forEach(function(pos){ (stored.slots[pos] || []).forEach(function(id){ if (id) ids.push(id); }); });
       state.lineup = buildLineup(stored.formation, ids);
+      // Verkaufsmarken ueberleben keinen Neustart: alte Luecken zuerst mit der
+      // Kickbase-Elf, dann mit den besten Bankspielern fuellen
+      fillHoles(kickbaseLineup().ids.concat(bestIds()));
       return;
     }
     useKickbaseLineup();
+  }
+  function fillHoles(ids){
+    var placed = placedIds(), filled = [];
+    ids.forEach(function(id){
+      var p = playerById(id), slots = p && state.lineup.slots[p.pos];
+      if (!slots || placed[id] || state.sell[id]) return;
+      var free = slots.indexOf(null);
+      if (free < 0) return;
+      slots[free] = id; placed[id] = true; filled.push(p);
+    });
+    return filled;
   }
   function setFormation(f){
     var ids = [];
@@ -586,7 +601,7 @@
         var p = id && playerById(id), key = pos + ':' + i, picked = state.pick === key ? ' picked' : '';
         if (!p){
           missing[pos] = (missing[pos] || 0) + 1;
-          return '<button type="button" class="slot empty missing' + picked + '" data-slot="' + key + '" aria-label="' + POS_LABEL[pos] + ' wählen"><span class="av">+</span><span class="sn">fehlt</span><span class="sv">' + pos + '</span></button>';
+          return '<button type="button" class="slot open missing' + picked + '" data-slot="' + key + '" aria-label="' + POS_LABEL[pos] + ' wählen"><span class="av">+</span><span class="sn">fehlt</span><span class="sv">' + pos + '</span></button>';
         }
         var e = expected(p);
         count++; points += e; value += p.mv;
@@ -602,15 +617,31 @@
       '<button type="button" class="text-btn" id="lineupAuto">Beste Elf</button></span></div>';
     if (!state.pick) html += needHtml(missing, placed);
 
-    var bench = lineupPool().filter(function(p){ return !placed[p.id]; })
-      .sort(function(a, b){ return POS_ORDER.indexOf(a.pos) - POS_ORDER.indexOf(b.pos) || b.mv - a.mv; });
+    // Darunter alle Spieler wie in der Liste: erst die Elf (Reihenfolge wie auf dem Feld), dann die Bank
+    var field = [];
+    POS_ORDER.forEach(function(pos){ lu.slots[pos].forEach(function(id){ var p = id && playerById(id); if (p) field.push(p); }); });
+    html += '<div class="bench-head num"><span><b>Aufgestellt</b> · ' + field.length + ' Spieler · ' + short(value) + '</span></div>';
+    html += groupedRows(field, compact);
+
+    var bench = lineupPool().filter(function(p){ return !placed[p.id]; }).sort(function(a, b){ return b.mv - a.mv; });
     var own = bench.filter(function(p){ return !p.bought; });
     var benchValue = own.reduce(function(s, p){ return s + p.mv; }, 0);
     var allSold = own.length && own.every(function(p){ return state.sell[p.id]; });
     html += '<div class="bench-head num"><span><b>Bank</b> · ' + bench.length + ' Spieler · ' + short(benchValue) + '</span>' +
       (own.length ? '<button type="button" class="btn' + (allSold ? ' on' : '') + '" id="benchSell">' + (allSold ? 'Alle zurück' : 'Alle verkaufen') + '</button>' : '') + '</div>';
     if (!bench.length) html += '<p class="pitch-hint">Alle Spieler stehen auf dem Feld.</p>';
-    bench.forEach(function(p){ html += squadRow(p, true); });
+    html += groupedRows(bench, compact);
+    return html;
+  }
+  function groupedRows(list, compact){
+    var html = '';
+    POS_ORDER.forEach(function(pos){
+      var items = list.filter(function(p){ return p.pos === pos; });
+      if (!items.length) return;
+      var sum = items.reduce(function(s, p){ return s + p.mv; }, 0);
+      html += '<div class="group num"><span>' + POS_LABEL[pos] + '</span><span>' + items.length + ' · ' + short(sum) + '</span></div>';
+      items.forEach(function(p){ html += squadRow(p, compact, true); });
+    });
     return html;
   }
 
@@ -948,7 +979,10 @@
       b.addEventListener('click', function(){
         var id = b.getAttribute('data-sell');
         state.lineupNote = null; state.pick = null;
-        if (state.sell[id]) delete state.sell[id];
+        if (state.sell[id]){
+          delete state.sell[id];
+          if (state.lineup && fillHoles([id]).length){ state.lineupNote = playerById(id).name + ' ist wieder auf dem Feld.'; saveLineup(); }
+        }
         else { state.sell[id] = true; removeFromLineup(id); }
         render();
       });
@@ -1006,6 +1040,7 @@
       var bench = state.players.filter(function(p){ return !placed[p.id]; });   // nur eigene Spieler, keine Gebote
       var allSold = bench.every(function(p){ return state.sell[p.id]; });
       bench.forEach(function(p){ if (allSold) delete state.sell[p.id]; else state.sell[p.id] = true; });
+      if (allSold){ fillHoles(bench.map(function(p){ return p.id; })); saveLineup(); }
       render();
     });
     each('#body [data-buy]', function(b){

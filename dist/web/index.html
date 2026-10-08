@@ -187,12 +187,12 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
 .pitch{ position:relative; margin:12px 20px 0; padding:16px 4px; border:1px solid var(--line); border-radius:16px; background:var(--hi); display:flex; flex-direction:column; gap:14px; overflow:hidden; }
 .pitch::before{ content:""; position:absolute; left:0; right:0; top:50%; border-top:1px solid var(--line); }
 .pitch::after{ content:""; position:absolute; left:50%; top:50%; width:72px; height:72px; margin:-36px 0 0 -36px; border:1px solid var(--line); border-radius:50%; }
-.line{ position:relative; z-index:1; display:flex; justify-content:space-evenly; gap:2px; }
-.slot{ display:flex; flex-direction:column; align-items:center; gap:3px; width:64px; min-height:44px; }
+.line{ position:relative; z-index:1; display:flex; justify-content:space-evenly; align-items:flex-start; gap:2px; }
+.slot{ display:flex; flex-direction:column; align-items:center; justify-content:flex-start; align-self:flex-start; gap:3px; flex:0 1 72px; min-width:0; min-height:44px; padding:0; margin:0; }
 .slot .av{ width:44px; height:44px; border-radius:50%; display:grid; place-items:center; background:var(--bg); border:1px solid var(--btn-line); font-size:13px; font-weight:600; }
-.slot.empty .av{ border-style:dashed; color:var(--faint); font-size:20px; font-weight:400; }
-.slot .sn{ max-width:64px; font-size:12px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.slot.empty .sn{ color:var(--faint); }
+.slot.open .av{ border-style:dashed; color:var(--faint); font-size:20px; font-weight:400; }
+.slot .sn{ max-width:100%; font-size:12px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.slot.open .sn{ color:var(--faint); }
 .slot .sv{ font-size:11px; color:var(--mut); margin-top:-2px; }
 .pitch-meta{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:6px 20px 0; font-size:13px; color:var(--mut); }
 .pitch-actions{ display:flex; gap:14px; flex:none; }
@@ -327,8 +327,8 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   .seg, .pitch, .advice, .picker, .lineup-note{ margin-left:0; margin-right:0; }
   .need-title, .need-sub{ padding-left:0; padding-right:0; }
   .cols .seg{ margin-top:12px; }
-  .cols .slot{ width:58px; }
-  .cols .slot .sn{ max-width:58px; }
+  .cols .slot{ flex-basis:58px; }
+  .cols .slot .sn{ max-width:100%; }
   .rank-bar, .rank-meta, .opp-squad{ margin-left:0; padding-left:0; }
   .cols .rank-no{ display:none; }
   .sheet{ bottom:auto; top:50%; transform:translate(-50%, -50%); border-radius:16px; max-width:420px; }
@@ -1586,7 +1586,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   }
 
   // ---------- Kader ----------
-  function squadRow(p, compact){
+  function squadRow(p, compact, withPoints){
     if (p.bought){
       // Vorgemerkter Kauf: kommt bei Erfolg dazu, laesst sich nur als Gebot zuruecknehmen
       return '<div class="row' + (compact ? '' : ' np') + '">' + (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
@@ -1596,6 +1596,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     }
     var sold = !!state.sell[p.id];
     var sub = [];
+    if (withPoints && (p.ap != null || formOf(p))) sub.push('≈ ' + Math.round(expected(p)) + ' P');
     if (p.gain != null) sub.push('<span class="' + signCls(p.gain) + '">' + delta(p.gain) + ' seit Kauf</span>');
     if (p.ap != null) sub.push('Ø ' + p.ap);
     var f = formOf(p);
@@ -1706,9 +1707,23 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       var ids = [];
       POS_ORDER.forEach(function(pos){ (stored.slots[pos] || []).forEach(function(id){ if (id) ids.push(id); }); });
       state.lineup = buildLineup(stored.formation, ids);
+      // Verkaufsmarken ueberleben keinen Neustart: alte Luecken zuerst mit der
+      // Kickbase-Elf, dann mit den besten Bankspielern fuellen
+      fillHoles(kickbaseLineup().ids.concat(bestIds()));
       return;
     }
     useKickbaseLineup();
+  }
+  function fillHoles(ids){
+    var placed = placedIds(), filled = [];
+    ids.forEach(function(id){
+      var p = playerById(id), slots = p && state.lineup.slots[p.pos];
+      if (!slots || placed[id] || state.sell[id]) return;
+      var free = slots.indexOf(null);
+      if (free < 0) return;
+      slots[free] = id; placed[id] = true; filled.push(p);
+    });
+    return filled;
   }
   function setFormation(f){
     var ids = [];
@@ -1741,7 +1756,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
         var p = id && playerById(id), key = pos + ':' + i, picked = state.pick === key ? ' picked' : '';
         if (!p){
           missing[pos] = (missing[pos] || 0) + 1;
-          return '<button type="button" class="slot empty missing' + picked + '" data-slot="' + key + '" aria-label="' + POS_LABEL[pos] + ' wählen"><span class="av">+</span><span class="sn">fehlt</span><span class="sv">' + pos + '</span></button>';
+          return '<button type="button" class="slot open missing' + picked + '" data-slot="' + key + '" aria-label="' + POS_LABEL[pos] + ' wählen"><span class="av">+</span><span class="sn">fehlt</span><span class="sv">' + pos + '</span></button>';
         }
         var e = expected(p);
         count++; points += e; value += p.mv;
@@ -1757,15 +1772,31 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       '<button type="button" class="text-btn" id="lineupAuto">Beste Elf</button></span></div>';
     if (!state.pick) html += needHtml(missing, placed);
 
-    var bench = lineupPool().filter(function(p){ return !placed[p.id]; })
-      .sort(function(a, b){ return POS_ORDER.indexOf(a.pos) - POS_ORDER.indexOf(b.pos) || b.mv - a.mv; });
+    // Darunter alle Spieler wie in der Liste: erst die Elf (Reihenfolge wie auf dem Feld), dann die Bank
+    var field = [];
+    POS_ORDER.forEach(function(pos){ lu.slots[pos].forEach(function(id){ var p = id && playerById(id); if (p) field.push(p); }); });
+    html += '<div class="bench-head num"><span><b>Aufgestellt</b> · ' + field.length + ' Spieler · ' + short(value) + '</span></div>';
+    html += groupedRows(field, compact);
+
+    var bench = lineupPool().filter(function(p){ return !placed[p.id]; }).sort(function(a, b){ return b.mv - a.mv; });
     var own = bench.filter(function(p){ return !p.bought; });
     var benchValue = own.reduce(function(s, p){ return s + p.mv; }, 0);
     var allSold = own.length && own.every(function(p){ return state.sell[p.id]; });
     html += '<div class="bench-head num"><span><b>Bank</b> · ' + bench.length + ' Spieler · ' + short(benchValue) + '</span>' +
       (own.length ? '<button type="button" class="btn' + (allSold ? ' on' : '') + '" id="benchSell">' + (allSold ? 'Alle zurück' : 'Alle verkaufen') + '</button>' : '') + '</div>';
     if (!bench.length) html += '<p class="pitch-hint">Alle Spieler stehen auf dem Feld.</p>';
-    bench.forEach(function(p){ html += squadRow(p, true); });
+    html += groupedRows(bench, compact);
+    return html;
+  }
+  function groupedRows(list, compact){
+    var html = '';
+    POS_ORDER.forEach(function(pos){
+      var items = list.filter(function(p){ return p.pos === pos; });
+      if (!items.length) return;
+      var sum = items.reduce(function(s, p){ return s + p.mv; }, 0);
+      html += '<div class="group num"><span>' + POS_LABEL[pos] + '</span><span>' + items.length + ' · ' + short(sum) + '</span></div>';
+      items.forEach(function(p){ html += squadRow(p, compact, true); });
+    });
     return html;
   }
 
@@ -2103,7 +2134,10 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       b.addEventListener('click', function(){
         var id = b.getAttribute('data-sell');
         state.lineupNote = null; state.pick = null;
-        if (state.sell[id]) delete state.sell[id];
+        if (state.sell[id]){
+          delete state.sell[id];
+          if (state.lineup && fillHoles([id]).length){ state.lineupNote = playerById(id).name + ' ist wieder auf dem Feld.'; saveLineup(); }
+        }
         else { state.sell[id] = true; removeFromLineup(id); }
         render();
       });
@@ -2161,6 +2195,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       var bench = state.players.filter(function(p){ return !placed[p.id]; });   // nur eigene Spieler, keine Gebote
       var allSold = bench.every(function(p){ return state.sell[p.id]; });
       bench.forEach(function(p){ if (allSold) delete state.sell[p.id]; else state.sell[p.id] = true; });
+      if (allSold){ fillHoles(bench.map(function(p){ return p.id; })); saveLineup(); }
       render();
     });
     each('#body [data-buy]', function(b){
