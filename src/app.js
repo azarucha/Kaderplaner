@@ -634,7 +634,7 @@
           ' · ' + r.formation + '</div></div>' +
         '<button type="button" class="btn" data-advice="' + o[0] + '">Übernehmen</button></div>';
     });
-    return html + '<p class="advice-note">Bewertet nach Punkteschnitt und Verletzungsstatus, Verkauf an Kickbase zum Marktwert. Spieler ohne Punkteschnitt (z. B. Neuzugänge) zählen mit 0.</p></div>';
+    return html + '<p class="advice-note">Bewertet nach Punkteschnitt, Ausfälle mit Abschlag (angeschlagen 90 %, verletzt 40 %). Verkauf an Kickbase zum Marktwert. Spieler ohne Punkteschnitt (z. B. Neuzugänge) zählen mit 0.</p></div>';
   }
 
   function applyAdvice(kind){

@@ -94,8 +94,8 @@ const SQUAD = [
 
 test('Beste Elf: Formation und Punkte, verletzte Spieler zaehlen nicht', () => {
   const r = C.bestEleven(SQUAD);
-  // 5-3-2 nutzt die Abwehrtiefe; der verletzte Stuermer s2 zaehlt 0, deshalb
-  // spielt s3 (60 P) statt des vierten Mittelfeldspielers (20 P)
+  // 5-3-2 nutzt die Abwehrtiefe; der verletzte Stuermer s2 zaehlt nur 40 % (40 P),
+  // deshalb spielt s3 (60 P) und nicht der vierte Mittelfeldspieler (20 P)
   assert.equal(r.formation, '5-3-2');
   assert.equal(r.points, 119 + (127 + 119 + 104 + 78 + 70) + (159 + 127 + 44) + (104 + 60));
   // fehlende Spieler kosten je 100 Punkte
@@ -107,7 +107,7 @@ test('Verkaufsempfehlung: erst Bank und Verletzte, Betrag reicht, Ergebnis optim
   const r = C.recommendSales(SQUAD, need);
   assert.ok(r.possible);
   assert.ok(r.points.money >= need);
-  // Der verletzte Stuermer (12,6 Mio, 0 erwartete Punkte) ist der offensichtliche Verkauf
+  // Der verletzte Stuermer (12,6 Mio, nicht in der besten Elf) ist der offensichtliche Verkauf
   assert.ok(r.points.ids.includes('s2'));
   // Gegenprobe per Brute Force: keine Kombination verliert weniger Punkte
   const ids = SQUAD.map(p => p.id);

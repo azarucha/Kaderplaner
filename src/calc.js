@@ -217,11 +217,16 @@
   var FORMATIONS = ['3-4-3', '3-5-2', '3-6-1', '4-2-4', '4-3-3', '4-4-2', '4-5-1', '5-2-3', '5-3-2', '5-4-1'];
   var EMPTY_SLOT = -100;   // Kickbase zieht fuer jeden leeren Aufstellungsplatz 100 Punkte ab
 
-  // Statuscodes: 1 verletzt, 2 angeschlagen, 4 Reha, 16 Sperre, 256 freigestellt
+  // Statuscodes: 1 verletzt, 2 angeschlagen, 4 Reha, 16 Sperre, 256 freigestellt.
+  // Ein Verkauf wirkt die ganze Saison, ein Ausfall meist nur einige Spieltage -
+  // deshalb Abschlaege nach typischer Ausfalldauer statt "faellt aus = 0".
   function availability(status){
     status = status || 0;
-    if (status & (1 | 4 | 16 | 256)) return 0;
-    if (status & 2) return 0.6;
+    if (status & 256) return 0;      // verlaesst den Verein
+    if (status & 4) return 0.2;      // Reha, lange raus
+    if (status & 1) return 0.4;      // verletzt, Dauer unklar
+    if (status & 16) return 0.8;     // Sperre, meist ein bis zwei Spiele
+    if (status & 2) return 0.9;      // angeschlagen
     return 1;
   }
   function expectedPoints(p){ return (p.ap || 0) * availability(p.status); }
