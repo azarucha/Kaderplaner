@@ -4,374 +4,236 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kaderplaner</title>
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Kaderplaner">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#14201a">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#121014">
 <style>
-  :root{
-    --bg:#f4f6f0;
-    --surface:#ffffff;
-    --surface-2:#eef1e8;
-    --ink:#161e18;
-    --ink-muted:#5c6b5e;
-    --border:#dde3d5;
-    --accent:#2e6f4e;
-    --accent-ink:#ffffff;
-    --accent-soft:#e3efe6;
-    --sell:#b8432c;
-    --sell-soft:#f6e4de;
-    --shadow: 0 1px 2px rgba(20,32,26,.06), 0 8px 24px -12px rgba(20,32,26,.18);
+/* Kaderplaner - Design "Matchday" */
+:root{
+  --bg:#f6f3ee; --surf:#ffffff; --surf2:#f0ebe3; --ink:#1d1a16; --mut:#776e63; --line:#ebe4da;
+  --acc:#ff5a1f; --acc2:#7b2ff7; --pos:#0a8a56; --neg:#d9342a; --neg-soft:#fde6e3; --warn-soft:#fff1d6; --warn:#9a5b00;
+  --shadow:0 1px 3px rgba(40,30,20,.08);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121014; --surf:#1d1a20; --surf2:#29252e; --ink:#f4f0f8; --mut:#a49cae; --line:#2e2934;
+    --acc:#ff7a45; --acc2:#9d6bff; --pos:#3ddc97; --neg:#ff6b61; --neg-soft:#3b1b1a; --warn-soft:#3a2b10; --warn:#ffc266;
+    --shadow:0 1px 3px rgba(0,0,0,.4);
+    color-scheme: dark;
   }
-  @media (prefers-color-scheme: dark){
-    :root:not([data-theme="light"]){
-      --bg:#10140f;
-      --surface:#181f18;
-      --surface-2:#1f281e;
-      --ink:#edf1e6;
-      --ink-muted:#93a390;
-      --border:#2b352a;
-      --accent:#57b884;
-      --accent-ink:#0c1610;
-      --accent-soft:#1c3327;
-      --sell:#e2765c;
-      --sell-soft:#3a2420;
-      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
-    }
-  }
-  :root[data-theme="dark"]{
-    --bg:#10140f;
-    --surface:#181f18;
-    --surface-2:#1f281e;
-    --ink:#edf1e6;
-    --ink-muted:#93a390;
-    --border:#2b352a;
-    --accent:#57b884;
-    --accent-ink:#0c1610;
-    --accent-soft:#1c3327;
-    --sell:#e2765c;
-    --sell-soft:#3a2420;
-    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
-  }
+}
+:root[data-theme="dark"]{
+  --bg:#121014; --surf:#1d1a20; --surf2:#29252e; --ink:#f4f0f8; --mut:#a49cae; --line:#2e2934;
+  --acc:#ff7a45; --acc2:#9d6bff; --pos:#3ddc97; --neg:#ff6b61; --neg-soft:#3b1b1a; --warn-soft:#3a2b10; --warn:#ffc266;
+  --shadow:0 1px 3px rgba(0,0,0,.4);
+  color-scheme: dark;
+}
 
-  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-  html,body{margin:0; padding:0;}
-  body{
-    background:var(--bg);
-    color:var(--ink);
-    font-family:"Public Sans", -apple-system, BlinkMacSystemFont, sans-serif;
-    -webkit-font-smoothing:antialiased;
-    min-height:100vh;
-    overscroll-behavior-y:none;
-  }
-  h1,h2,h3{
-    font-family:"Manrope", sans-serif;
-    text-wrap:balance;
-    margin:0;
-  }
-  .mono{ font-family:"IBM Plex Mono", ui-monospace, monospace; font-variant-numeric:tabular-nums; }
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body{ margin:0; padding:0; }
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing:antialiased; min-height:100vh; overscroll-behavior-y:none;
+}
+h1,h2,h3{ margin:0; text-wrap:balance; }
+button{ font:inherit; color:inherit; border:0; background:none; cursor:pointer; padding:0; }
+[hidden]{ display:none !important; }
+.mono{ font-variant-numeric:tabular-nums; }
+.up{ color:var(--pos); } .dn{ color:var(--neg); }
+.app{ max-width:520px; margin:0 auto; min-height:100vh; position:relative; }
 
-  .app{ max-width:480px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; position:relative; background:var(--bg);}
-  [hidden]{display:none!important;}
+/* ---------- Setup ---------- */
+.setup{ min-height:100vh; display:flex; flex-direction:column; justify-content:center; gap:24px; padding:max(28px, env(safe-area-inset-top)) 20px 32px; }
+.brand{ display:flex; flex-direction:column; gap:8px; align-items:center; text-align:center; }
+.brand-badge{ width:60px; height:60px; border-radius:18px; background:linear-gradient(135deg,var(--acc),var(--acc2)); display:grid; place-items:center; font-weight:800; font-size:22px; color:#fff; box-shadow:0 12px 26px -12px var(--acc2); }
+.brand h1{ font-size:24px; letter-spacing:-.02em; }
+.brand p{ color:var(--mut); font-size:14px; margin:0; max-width:32ch; }
+.field-label{ display:block; font-size:12px; font-weight:700; color:var(--mut); margin-bottom:8px; }
+textarea#tokenInput{ width:100%; min-height:92px; resize:vertical; background:var(--surf); color:var(--ink); border:1px solid var(--line); border-radius:16px; padding:14px; font:12px/1.5 ui-monospace, Menlo, monospace; }
+textarea#tokenInput:focus{ outline:2px solid var(--acc); outline-offset:2px; }
+.btn-primary{ width:100%; padding:15px; border-radius:16px; font-weight:800; font-size:15px; color:#fff; background:linear-gradient(135deg,var(--acc),var(--acc2)); }
+.btn-primary:disabled{ opacity:.55; }
+details.howto{ background:var(--surf); border-radius:16px; padding:14px 16px; }
+details.howto summary{ font-weight:700; font-size:14px; list-style:none; display:flex; justify-content:space-between; }
+details.howto summary::-webkit-details-marker{ display:none; }
+details.howto summary::after{ content:"+"; color:var(--mut); }
+details.howto[open] summary::after{ content:"–"; }
+details.howto ol{ margin:12px 0 0; padding-left:20px; font-size:13.5px; color:var(--mut); line-height:1.6; }
+code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-monospace, Menlo, monospace; color:var(--ink); }
+.status-msg{ font-size:13px; text-align:center; padding:10px 14px; border-radius:12px; background:var(--neg-soft); color:var(--neg); font-weight:600; }
+.footer-note{ text-align:center; font-size:11.5px; color:var(--mut); padding:4px 20px 0; margin:0; line-height:1.5; }
 
-  /* ---------- Setup screen ---------- */
-  .setup{ flex:1; display:flex; flex-direction:column; justify-content:center; gap:28px; padding:max(28px, env(safe-area-inset-top)) 24px 32px; }
-  .brand{ display:flex; flex-direction:column; gap:6px; align-items:center; text-align:center; }
-  .brand-badge{
-    width:56px; height:56px; border-radius:16px;
-    background:linear-gradient(155deg, var(--accent), #1c4f36);
-    display:flex; align-items:center; justify-content:center;
-    font-family:"Manrope"; font-weight:800; font-size:22px; color:#fff;
-    box-shadow:var(--shadow);
-  }
-  .brand h1{ font-size:22px; letter-spacing:-.01em; }
-  .brand p{ color:var(--ink-muted); font-size:14px; margin:0; max-width:34ch; }
+/* ---------- Header + Hero ---------- */
+.hd{ padding:max(14px, env(safe-area-inset-top)) 14px 0; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.pill{ background:var(--surf); border-radius:20px; padding:8px 13px; font-weight:800; font-size:14px; box-shadow:var(--shadow); max-width:62vw; display:flex; gap:6px; align-items:center; }
+.pill span:first-child{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.caret{ color:var(--mut); font-size:12px; }
+.hd-actions{ display:flex; gap:8px; }
+.round{ width:36px; height:36px; border-radius:50%; background:var(--surf); box-shadow:var(--shadow); display:grid; place-items:center; font-size:16px; }
+.round.avatar{ background:linear-gradient(135deg,var(--acc),var(--acc2)) center/cover; }
+.round.spin{ animation:spin .8s linear infinite; }
 
-  .field-label{ font-size:12px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-muted); margin-bottom:8px; display:block; }
-  textarea#tokenInput{
-    width:100%; min-height:92px; resize:vertical;
-    background:var(--surface); color:var(--ink);
-    border:1px solid var(--border); border-radius:14px;
-    padding:14px; font-family:"IBM Plex Mono", monospace; font-size:12px; line-height:1.5;
-  }
-  textarea#tokenInput:focus{ outline:2px solid var(--accent); outline-offset:2px; }
+.hero{ margin:12px 14px 0; border-radius:22px; padding:16px 18px; color:#fff; background:linear-gradient(135deg,var(--acc) 0%, var(--acc2) 100%); box-shadow:0 14px 30px -16px var(--acc2); }
+.hero.neg{ background:linear-gradient(135deg,#e0362c 0%, var(--acc2) 100%); }
+.hero-l{ font-size:12px; opacity:.85; font-weight:700; }
+.hero-v{ font-size:31px; font-weight:800; letter-spacing:-.02em; margin-top:1px; }
+.hero-g{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:12px; }
+.hero-g div{ background:rgba(255,255,255,.17); border-radius:12px; padding:8px 9px; min-width:0; }
+.hero-g span{ font-size:10.5px; opacity:.9; display:block; }
+.hero-g b{ display:block; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hero-sub{ font-size:11.5px; opacity:.9; margin-top:10px; }
+.hero-sub:empty{ display:none; }
 
-  button{ font-family:inherit; cursor:pointer; border:none; }
-  .btn-primary{
-    background:var(--accent); color:var(--accent-ink);
-    font-family:"Manrope"; font-weight:700; font-size:15px;
-    padding:15px; border-radius:14px; width:100%;
-    box-shadow:var(--shadow);
-  }
-  .btn-primary:active{ transform:scale(.98); }
-  .btn-primary:disabled{ opacity:.55; }
+.alert{ margin:8px 14px 0; border-radius:14px; padding:9px 12px; font-size:12.5px; font-weight:700; background:var(--neg-soft); color:var(--neg); }
+.alert.warn{ background:var(--warn-soft); color:var(--warn); }
 
-  details.howto{ background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px 16px; }
-  details.howto summary{ font-weight:600; font-size:14px; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center;}
-  details.howto summary::-webkit-details-marker{ display:none; }
-  details.howto summary::after{ content:"+"; font-size:18px; color:var(--ink-muted); }
-  details.howto[open] summary::after{ content:"–"; }
-  details.howto ol{ margin:12px 0 0; padding-left:20px; font-size:13.5px; color:var(--ink-muted); line-height:1.6; }
-  details.howto code{ background:var(--surface-2); padding:1px 5px; border-radius:5px; font-family:"IBM Plex Mono", monospace; font-size:12px; color:var(--ink); }
+/* ---------- Listen ---------- */
+#body{ padding-bottom:110px; }
+.ttl{ padding:18px 18px 8px; display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+.ttl b{ font-size:17px; letter-spacing:-.01em; }
+.ttl span{ font-size:12px; color:var(--mut); }
+.card{ margin:0 14px 8px; background:var(--surf); border-radius:16px; padding:10px 12px; display:flex; gap:10px; align-items:center; box-shadow:var(--shadow); }
+.card.sold{ box-shadow:inset 0 0 0 2px var(--neg); }
+.card.bought{ box-shadow:inset 0 0 0 2px var(--acc); }
+.ph{ width:38px; height:38px; border-radius:12px; background:var(--surf2) center/cover no-repeat; flex:none; position:relative; }
+.ph i{ position:absolute; left:-4px; bottom:-4px; font-style:normal; font-size:9px; font-weight:800; background:var(--surf); color:var(--mut); border-radius:6px; padding:1px 4px; box-shadow:var(--shadow); }
+.mid{ flex:1; min-width:0; }
+.mid .n{ font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mid .m{ font-size:11.5px; color:var(--mut); margin-top:2px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+.rt{ text-align:right; flex:none; }
+.rt b{ font-size:13.5px; display:block; }
+.rt small{ font-size:11px; font-weight:700; }
+.act{ font-size:11.5px; font-weight:800; padding:8px 10px; border-radius:10px; background:var(--surf2); flex:none; min-width:74px; text-align:center; }
+.act.sell{ background:var(--neg); color:#fff; }
+.act.buy{ background:var(--ink); color:var(--bg); }
+.tag{ font-size:10.5px; font-weight:800; padding:2px 7px; border-radius:20px; background:var(--surf2); color:var(--mut); white-space:nowrap; }
+.tag.hot{ background:var(--acc); color:#fff; }
+.tag.bad{ background:var(--neg-soft); color:var(--neg); }
+.dot{ width:7px; height:7px; border-radius:50%; background:var(--neg); display:inline-block; }
+.bid{ margin:-4px 14px 8px; background:var(--surf); border-radius:0 0 16px 16px; padding:2px 12px 10px 60px; display:flex; align-items:center; gap:8px; font-size:12px; color:var(--mut); }
+.bid input{ width:120px; font:700 14px ui-monospace, Menlo, monospace; padding:7px 9px; border-radius:9px; border:1px solid var(--line); background:var(--bg); color:var(--ink); }
+.bid input:focus{ outline:2px solid var(--acc); }
 
-  .status-msg{ font-size:13px; text-align:center; padding:10px 14px; border-radius:10px; }
-  .status-msg.error{ background:var(--sell-soft); color:var(--sell); }
-  .status-msg.ok{ background:var(--accent-soft); color:var(--accent); }
+/* ---------- Gegner ---------- */
+.info{ margin:12px 14px 0; background:var(--surf); border-radius:16px; padding:12px 14px; font-size:12px; color:var(--mut); line-height:1.5; box-shadow:var(--shadow); }
+.info summary{ font-weight:800; color:var(--ink); font-size:13px; list-style:none; display:flex; justify-content:space-between; }
+.info summary::-webkit-details-marker{ display:none; }
+.info summary::after{ content:"+"; color:var(--mut); }
+.info[open] summary::after{ content:"–"; }
+.info p{ margin:8px 0 0; }
+.check{ color:var(--pos); font-weight:700; }
+.check.bad{ color:var(--neg); }
+.rank{ margin:0 14px 8px; background:var(--surf); border-radius:16px; padding:12px 14px; box-shadow:var(--shadow); width:calc(100% - 28px); text-align:left; display:block; }
+.rank .h{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.rank .h .n{ font-weight:800; font-size:14.5px; display:flex; align-items:center; gap:6px; min-width:0; }
+.rank .h .n span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rank .h .p{ font-weight:800; font-size:15px; white-space:nowrap; }
+.rank .bar{ height:12px; border-radius:8px; background:var(--surf2); margin:9px 0 7px; position:relative; overflow:hidden; }
+.rank .bar i{ position:absolute; top:0; bottom:0; left:0; border-radius:8px; background:linear-gradient(90deg,var(--acc),var(--acc2)); }
+.rank .bar s{ position:absolute; top:0; bottom:0; background:repeating-linear-gradient(135deg, rgba(255,255,255,.55) 0 3px, transparent 3px 6px); }
+.rank .m{ font-size:11.5px; color:var(--mut); display:flex; gap:4px 10px; flex-wrap:wrap; }
+.rank.dim{ opacity:.5; }
+.you{ font-size:9.5px; font-weight:800; background:var(--acc); color:#fff; padding:2px 6px; border-radius:6px; flex:none; }
+.opp-squad{ margin-top:10px; border-top:1px solid var(--line); }
+.opp-row{ display:flex; gap:8px; align-items:center; padding:7px 0; border-bottom:1px solid var(--line); font-size:12.5px; }
+.opp-row:last-child{ border-bottom:0; }
+.opp-row .pos{ font-size:9.5px; font-weight:800; color:var(--mut); background:var(--surf2); border-radius:6px; padding:2px 0; width:30px; text-align:center; flex:none; }
+.opp-row .nm{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+.opp-row .v{ text-align:right; flex:none; }
+.opp-row .v small{ display:block; font-size:10.5px; font-weight:700; }
 
-  /* ---------- Top bar ---------- */
-  .topbar{
-    position:sticky; top:0; z-index:20;
-    background:color-mix(in srgb, var(--surface) 92%, transparent);
-    backdrop-filter:blur(14px);
-    -webkit-backdrop-filter:blur(14px);
-    border-bottom:1px solid var(--border);
-    padding:max(14px, env(safe-area-inset-top)) 18px 12px;
-    display:flex; align-items:center; justify-content:space-between; gap:10px;
-  }
-  .topbar .title{ display:flex; flex-direction:column; gap:1px; min-width:0; }
-  .topbar h1{ font-size:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .topbar .sub{ font-size:11.5px; color:var(--ink-muted); }
-  .icon-btn{
-    width:36px; height:36px; border-radius:10px; background:var(--surface-2);
-    display:flex; align-items:center; justify-content:center; color:var(--ink); flex:none;
-    font-size:16px;
-  }
-  .icon-btn:active{ transform:scale(.94); }
+/* ---------- Navigation ---------- */
+.nav{ position:fixed; left:50%; transform:translateX(-50%); bottom:max(14px, env(safe-area-inset-bottom)); width:calc(100% - 28px); max-width:492px; display:flex; justify-content:space-around; padding:7px; border-radius:22px; background:var(--ink); color:var(--bg); z-index:30; box-shadow:0 12px 30px -10px rgba(0,0,0,.45); }
+.nav button{ flex:1; font-size:12.5px; font-weight:800; opacity:.6; padding:9px 0; border-radius:16px; color:inherit; }
+.nav button.on{ opacity:1; background:var(--acc); color:#fff; }
 
-  /* ---------- League picker ---------- */
-  .leagues{ padding:20px 18px 40px; display:flex; flex-direction:column; gap:12px; flex:1; }
-  .league-card{
-    background:var(--surface); border:1px solid var(--border); border-radius:16px;
-    padding:16px 18px; display:flex; align-items:center; gap:14px;
-    box-shadow:var(--shadow); text-align:left; width:100%;
-  }
-  .league-card:active{ transform:scale(.985); }
-  .league-avatar{ width:44px; height:44px; border-radius:12px; background:var(--surface-2); object-fit:cover; flex:none; }
-  .league-info{ min-width:0; flex:1; }
-  .league-info .name{ font-family:"Manrope"; font-weight:700; font-size:15px; }
-  .league-info .meta{ font-size:12.5px; color:var(--ink-muted); margin-top:2px; }
-  .league-card .chev{ color:var(--ink-muted); font-size:18px; }
+/* ---------- Sheet ---------- */
+.sheet-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:40; }
+.sheet{ position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:100%; max-width:520px; background:var(--bg); border-radius:22px 22px 0 0; padding:10px 14px max(18px, env(safe-area-inset-bottom)); z-index:41; max-height:80vh; overflow:auto; }
+.sheet .grab{ width:40px; height:5px; border-radius:3px; background:var(--line); margin:0 auto 10px; }
+.sheet h3{ font-size:16px; margin:4px 4px 10px; }
+.sheet .item{ display:flex; gap:12px; align-items:center; width:100%; text-align:left; background:var(--surf); border-radius:14px; padding:12px; margin-bottom:8px; box-shadow:var(--shadow); }
+.sheet .item.on{ box-shadow:inset 0 0 0 2px var(--acc); }
+.sheet .item img, .sheet .item .ph{ width:40px; height:40px; border-radius:12px; object-fit:cover; background:var(--surf2); }
+.sheet .item b{ display:block; font-size:14.5px; }
+.sheet .item span{ font-size:12px; color:var(--mut); }
+.sheet .item.danger b{ color:var(--neg); }
 
-  /* ---------- Squad ---------- */
-  .summary-bar{
-    position:sticky; top:65px; z-index:15;
-    margin:14px 18px 4px; padding:14px 16px;
-    background:var(--surface); border:1px solid var(--border); border-radius:16px;
-    box-shadow:var(--shadow);
-    display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px;
-  }
-  .summary-bar .cell{ display:flex; flex-direction:column; gap:3px; }
-  .summary-bar .cell:not(:first-child){ border-left:1px solid var(--border); padding-left:12px; margin-left:-4px; }
-  .summary-bar .lbl{ font-size:10px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-muted); }
-  .summary-bar .val{ font-size:14px; font-weight:600; }
-  .summary-bar .val.neg{ color:var(--sell); }
-  .summary-bar .val.pos{ color:var(--accent); }
-
-  .limit-line{
-    margin:14px 18px 4px; padding:10px 14px;
-    border-radius:12px; font-size:12px; font-weight:600;
-    background:var(--surface-2); color:var(--ink-muted);
-  }
-  .limit-line.warn{ background:var(--sell-soft); color:var(--sell); }
-  .limit-line.ok{ background:var(--accent-soft); color:var(--accent); }
-
-  .pos-header{
-    padding:18px 18px 8px; font-size:12px; font-weight:700; letter-spacing:.06em;
-    text-transform:uppercase; color:var(--ink-muted);
-    display:flex; align-items:center; gap:8px;
-  }
-  .pos-header .count{ background:var(--surface-2); color:var(--ink-muted); font-size:10.5px; border-radius:20px; padding:2px 8px; font-weight:600; }
-
-  .players{ padding:0 12px 24px; display:flex; flex-direction:column; gap:8px; }
-  .player-card{
-    background:var(--surface); border:1px solid var(--border); border-radius:16px;
-    padding:12px 14px; display:flex; align-items:center; gap:12px;
-  }
-  .player-photo{ width:42px; height:42px; border-radius:11px; background:var(--surface-2); object-fit:cover; flex:none; }
-  .player-main{ flex:1; min-width:0; }
-  .player-name{ font-weight:600; font-size:14.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .player-sub{ display:flex; align-items:baseline; gap:7px; margin-top:2px; }
-  .player-mv{ font-size:13px; }
-  .player-delta{ font-size:11px; font-weight:600; }
-  .player-delta.pos{ color:var(--accent); }
-  .player-delta.neg{ color:var(--sell); }
-
-  .toggle{ display:flex; background:var(--surface-2); border-radius:10px; padding:3px; flex:none; }
-  .toggle button{
-    background:transparent; color:var(--ink-muted); font-size:12px; font-weight:600;
-    padding:7px 10px; border-radius:8px; font-family:"Manrope";
-  }
-  .toggle button.active-hold{ background:var(--surface); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.08); }
-  .toggle button.active-sell{ background:var(--sell); color:#fff; }
-  .pos-pill{ font-size:9.5px; font-weight:700; color:var(--ink-muted); background:var(--surface-2); border-radius:6px; padding:2px 6px; display:inline-block; }
-  .buy-btn{
-    flex:none; font-family:"Manrope"; font-weight:700; font-size:12.5px;
-    padding:9px 14px; border-radius:10px; background:var(--surface-2); color:var(--ink);
-  }
-  .buy-btn.active-buy{ background:var(--accent); color:var(--accent-ink); }
-  .status-dot{ width:7px; height:7px; border-radius:50%; background:var(--sell); flex:none; display:inline-block; }
-  .expiry{ font-size:10.5px; color:var(--ink-muted); }
-
-  /* ---------- Tabs ---------- */
-  .tabbar{
-    display:flex; gap:4px; margin:14px 18px 6px; padding:4px;
-    background:var(--surface-2); border-radius:12px;
-  }
-  .tabbar button{
-    flex:1; background:transparent; color:var(--ink-muted);
-    font-family:"Manrope"; font-weight:700; font-size:12.5px;
-    padding:9px 4px; border-radius:9px;
-  }
-  .tabbar button.active{ background:var(--surface); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.08); }
-
-  /* ---------- Opponents ---------- */
-  .opp-card{
-    background:var(--surface); border:1px solid var(--border); border-radius:16px;
-    padding:12px 14px; display:flex; flex-direction:column; gap:10px;
-  }
-  .opp-head{ display:flex; align-items:center; gap:12px; width:100%; text-align:left; background:transparent; }
-  .opp-avatar{ width:38px; height:38px; border-radius:10px; background:var(--surface-2); object-fit:cover; flex:none; }
-  .opp-info{ flex:1; min-width:0; }
-  .opp-name{ font-weight:600; font-size:14px; display:flex; align-items:center; gap:6px; }
-  .opp-name .you{ font-size:9.5px; font-weight:700; background:var(--accent-soft); color:var(--accent); padding:1px 7px; border-radius:20px; text-transform:uppercase; letter-spacing:.03em; }
-  .opp-meta{ font-size:11.5px; color:var(--ink-muted); margin-top:2px; }
-  .opp-chev{ color:var(--ink-muted); font-size:16px; transition:transform .15s; }
-  .opp-card.open .opp-chev{ transform:rotate(90deg); }
-  .opp-lineup{ display:flex; flex-direction:column; gap:6px; }
-  .opp-lineup-title{ font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-muted); }
-  .opp-player{ display:flex; flex-direction:column; gap:4px; padding:8px 0; border-top:1px solid var(--border); font-size:12.5px; }
-  .opp-player .row-top{ display:flex; align-items:center; gap:8px; }
-  .opp-player .row-bottom{ display:flex; align-items:center; gap:10px; padding-left:38px; }
-  .opp-player .pos-pill{ font-size:9.5px; font-weight:700; color:var(--ink-muted); background:var(--surface-2); border-radius:6px; padding:2px 6px; flex:none; width:30px; text-align:center; }
-  .opp-player .name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .opp-player .mv{ flex:none; }
-  .opp-player .trend{ flex:none; font-size:11px; font-weight:600; }
-  .opp-player .pts{ flex:none; color:var(--ink-muted); margin-left:auto; }
-
-  .bonus-box{
-    margin:14px 18px 4px; padding:14px 16px;
-    background:var(--accent-soft); border:1px solid var(--border); border-radius:16px;
-    display:flex; flex-direction:column; gap:8px;
-  }
-  .bonus-box-title{ font-size:12px; font-weight:700; color:var(--ink); }
-  .bonus-box-row{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink); }
-  .bonus-box-row input{
-    font-family:"IBM Plex Mono", monospace; font-size:14px; font-weight:600;
-    width:110px; padding:8px 10px; border-radius:9px; border:1px solid var(--border);
-    background:var(--surface); color:var(--ink);
-  }
-  .bonus-box-row input:focus{ outline:2px solid var(--accent); outline-offset:1px; }
-  .bonus-box .expiry{ line-height:1.5; }
-
-  .empty-state{ padding:60px 30px; text-align:center; color:var(--ink-muted); font-size:14px; }
-  .spinner{
-    width:22px; height:22px; border-radius:50%;
-    border:2.5px solid var(--border); border-top-color:var(--accent);
-    animation:spin .7s linear infinite; margin:40px auto;
-  }
-  @keyframes spin{ to{ transform:rotate(360deg);} }
-
-  .footer-note{ text-align:center; font-size:11px; color:var(--ink-muted); padding:0 24px 28px; }
-  .link-btn{ background:none; color:var(--accent); font-weight:600; font-size:13px; padding:4px; }
+/* ---------- Diverses ---------- */
+.empty{ padding:50px 30px; text-align:center; color:var(--mut); font-size:14px; line-height:1.5; }
+.link-btn{ color:var(--acc); font-weight:800; font-size:13px; padding:6px; }
+.spinner{ width:24px; height:24px; border-radius:50%; border:3px solid var(--line); border-top-color:var(--acc); animation:spin .7s linear infinite; margin:40px auto; }
+.progress{ text-align:center; color:var(--mut); font-size:12px; margin-top:-26px; }
+@keyframes spin{ to{ transform:rotate(360deg); } }
 
 </style>
-
 </head>
 <body>
 <div class="app" id="app">
 
   <!-- SETUP -->
-  <section class="setup" id="screen-setup">
+  <section class="setup" id="screen-setup" hidden>
     <div class="brand">
       <div class="brand-badge">KP</div>
       <h1>Kaderplaner</h1>
-      <p>Dein Kickbase-Kader auf dem Handy — Kontostand, Marktwerte und Verkaufsentscheidungen auf einen Blick.</p>
+      <p>Kontostand, Limits und die Bietkraft deiner Gegner auf einen Blick.</p>
     </div>
-
     <div>
       <label class="field-label" for="tokenInput">Kickbase-Token</label>
-      <textarea id="tokenInput" placeholder="eyJhbGciOi..." autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+      <textarea id="tokenInput" placeholder="eyJhbGciOi…" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
     </div>
-
     <div id="setupStatus"></div>
-
     <button class="btn-primary" id="connectBtn">Verbinden</button>
-
     <details class="howto">
       <summary>So bekommst du den Token</summary>
       <ol>
-        <li><strong>play.kickbase.com/freibier</strong> im Handy- oder Desktop-Browser öffnen und einloggen.</li>
-        <li>Am Desktop: F12 → Tab „Application" (Chrome) bzw. „Storage" (Firefox) → Local Storage → <code>https://play.kickbase.com</code> → Eintrag <code>kb.t</code>.</li>
-        <li>Den Wert (beginnt mit <code>eyJ...</code>) komplett kopieren — nicht abtippen, das erzeugt Tippfehler.</li>
-        <li>Hier oben einfügen und auf „Verbinden" tippen.</li>
-      </ol>
-      <ol style="margin-top:10px;">
-        <li>Der Token läuft nach ein paar Tagen automatisch ab — dann einfach die Schritte wiederholen und neu einfügen.</li>
+        <li><strong>play.kickbase.com</strong> im Browser öffnen und einloggen.</li>
+        <li>Am Desktop: F12 → „Application“ (Chrome) bzw. „Storage“ (Firefox) → Local Storage → <code>https://play.kickbase.com</code> → Eintrag <code>kb.t</code>.</li>
+        <li>Den Wert (beginnt mit <code>eyJ…</code>) komplett kopieren und hier einfügen.</li>
+        <li>Der Token läuft nach einigen Tagen ab. Dann die Schritte wiederholen.</li>
       </ol>
     </details>
-
-    <p class="footer-note">Der Token bleibt nur auf diesem Gerät gespeichert (lokal im Browser) und wird direkt an die Kickbase-API geschickt — sonst nirgendwohin.</p>
+    <p class="footer-note">Der Token bleibt auf diesem Gerät und geht nur an die Kickbase-API. Die App liest nur, sie bietet und verkauft nichts.</p>
   </section>
 
-  <!-- LEAGUES -->
-  <section id="screen-leagues" hidden>
-    <div class="topbar">
-      <div class="title">
-        <h1>Deine Ligen</h1>
-        <span class="sub" id="tokenName">—</span>
+  <!-- MAIN -->
+  <section id="screen-main" hidden>
+    <header class="hd">
+      <button class="pill" id="leagueBtn"><span id="leagueName">Liga</span> <span class="caret">▾</span></button>
+      <div class="hd-actions">
+        <button class="round" id="refreshBtn" aria-label="Aktualisieren">↻</button>
+        <button class="round avatar" id="menuBtn" aria-label="Menü"></button>
       </div>
-      <button class="icon-btn" id="logoutBtn" title="Token ändern">⋯</button>
+    </header>
+
+    <div class="hero" id="hero">
+      <div class="hero-l">Kontostand</div>
+      <div class="hero-v mono" id="heroBudget">–</div>
+      <div class="hero-g">
+        <div><span>Nach Plan</span><b class="mono" id="heroAfter">–</b></div>
+        <div><span>Spielraum</span><b class="mono" id="heroRoom">–</b></div>
+        <div><span>Kader</span><b class="mono" id="heroSquad">–</b></div>
+      </div>
+      <div class="hero-sub" id="heroSub"></div>
     </div>
-    <div class="leagues" id="leaguesList">
-      <div class="spinner"></div>
-    </div>
+    <div id="alerts"></div>
+
+    <main id="body"><div class="spinner"></div></main>
+
+    <nav class="nav" id="nav">
+      <button data-tab="kader" class="on">Kader</button>
+      <button data-tab="markt">Markt</button>
+      <button data-tab="gegner">Gegner</button>
+    </nav>
   </section>
 
-  <!-- SQUAD -->
-  <section id="screen-squad" hidden>
-    <div class="topbar">
-      <button class="icon-btn" id="backBtn">←</button>
-      <div class="title">
-        <h1 id="squadLeagueName">Liga</h1>
-        <span class="sub" id="squadMeta">—</span>
-      </div>
-      <button class="icon-btn" id="refreshBtn" title="Aktualisieren">↻</button>
-    </div>
-
-    <div class="summary-bar">
-      <div class="cell">
-        <span class="lbl">Kontostand</span>
-        <span class="val mono" id="sumBudget">—</span>
-      </div>
-      <div class="cell">
-        <span class="lbl">Verkauf/Kauf</span>
-        <span class="val mono pos" id="sumErlos">€ 0</span>
-      </div>
-      <div class="cell">
-        <span class="lbl">Neu</span>
-        <span class="val mono" id="sumNeu">—</span>
-      </div>
-    </div>
-    <div class="limit-line" id="sumLimit"></div>
-    <div class="limit-line warn" id="sumConstraints" hidden></div>
-
-    <div class="tabbar">
-      <button id="tabKader" class="active">Kader</button>
-      <button id="tabMarkt">Transfermarkt</button>
-      <button id="tabGegner">Gegner</button>
-    </div>
-
-    <div id="squadBody">
-      <div class="spinner"></div>
-    </div>
-  </section>
-
+  <!-- SHEET (Ligawahl, Menü) -->
+  <div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
+  <div class="sheet" id="sheet" hidden></div>
 </div>
+<script>
 
+</script>
 <script>
 // Demo-Modus: simuliert die benoetigten Kickbase-Endpunkte mit erfundenen Daten.
 // Wird nur in dist/demo.html eingebunden (Vorschau, Screenshots), nie in die App.
@@ -395,8 +257,8 @@
 
   var players = [], pid = 1000;
   for (var k = 0; k < 160; k++){
-    var pos = k < 18 ? 1 : (k < 70 ? 2 : (k < 125 ? 3 : 4));
-    var mv = round(500000 + Math.pow(rnd(), 2.2) * 24000000, 1000);
+    var pos = [1,2,2,2,2,3,3,3,3,4,4,4][k % 12];
+    var mv = round(300000 + Math.pow(rnd(), 2.6) * 14000000, 1000);
     var form = rnd();
     var pts = {};
     for (var d = 1; d <= 6; d++) pts[d] = Math.max(0, Math.round((15 + form * 75) * (0.2 + rnd() * 1.6) + (rnd() < 0.04 ? 180 : 0)));
@@ -440,9 +302,9 @@
   function wins(uid){ var w = 0; for (var d = 1; d <= 6; d++){ var best = managers.reduce(function(b, m){ return mdp(m.i, d) > mdp(b.i, d) ? m : b; }, managers[0]); if (best.i === uid) w++; } return w; }
   function mdDate(d){ return new Date(Date.parse(created) + (3 + d * 7) * DAY).toISOString(); }
   function sqItem(p, own){
-    var o = {pi: p.i, i: p.i, pn: p.n, n: p.n, pos: p.pos, tid: p.tid, mv: p.mv, mvgl: p.mvgl, ap: p.ap, st: p.st, prc: p.prc};
-    if (own) o.pim = "";
-    return o;
+    // Eigener Kader: mvgl = Gewinn seit Kauf, tfhmvt = Aenderung 24h; fremder Kader: prc = Kaufpreis
+    if (own) return {i: p.i, n: p.n, pos: p.pos, tid: p.tid, mv: p.mv, mvgl: p.mv - p.prc, tfhmvt: p.mvgl, ap: p.ap, st: p.st, ofc: p.i.slice(-1) === "3" ? 1 : 0};
+    return {pi: p.i, pn: p.n, pos: p.pos, tid: p.tid, mv: p.mv, ap: p.ap, st: p.st, prc: p.prc};
   }
 
   var routes = [
@@ -982,68 +844,65 @@
 (function(){
   "use strict";
 
-  var API = "https://api.kickbase.com/v4";
   var IMG_BASE = "https://kickbase.b-cdn.net/";
   var POS_MAP = {1:"TW", 2:"ABW", 3:"MF", 4:"ANG"};
   var POS_ORDER = ["TW","ABW","MF","ANG"];
   var POS_LABEL = {TW:"Torwart", ABW:"Abwehr", MF:"Mittelfeld", ANG:"Angriff"};
-
-  var els = {
-    setup: document.getElementById('screen-setup'),
-    leagues: document.getElementById('screen-leagues'),
-    squad: document.getElementById('screen-squad'),
-    tokenInput: document.getElementById('tokenInput'),
-    connectBtn: document.getElementById('connectBtn'),
-    setupStatus: document.getElementById('setupStatus'),
-    tokenName: document.getElementById('tokenName'),
-    leaguesList: document.getElementById('leaguesList'),
-    logoutBtn: document.getElementById('logoutBtn'),
-    backBtn: document.getElementById('backBtn'),
-    refreshBtn: document.getElementById('refreshBtn'),
-    squadLeagueName: document.getElementById('squadLeagueName'),
-    squadMeta: document.getElementById('squadMeta'),
-    squadBody: document.getElementById('squadBody'),
-    sumBudget: document.getElementById('sumBudget'),
-    sumErlos: document.getElementById('sumErlos'),
-    sumNeu: document.getElementById('sumNeu'),
-    sumLimit: document.getElementById('sumLimit'),
-    sumConstraints: document.getElementById('sumConstraints'),
-    tabKader: document.getElementById('tabKader'),
-    tabMarkt: document.getElementById('tabMarkt'),
-    tabGegner: document.getElementById('tabGegner'),
-  };
-
-  var currency = new Intl.NumberFormat('de-DE', {style:'currency', currency:'EUR', maximumFractionDigits:0});
-  function fmtMoney(n){ return currency.format(n || 0); }
-  function fmtDelta(n){
-    n = n || 0;
-    var s = currency.format(Math.abs(n));
-    return (n >= 0 ? "+" : "−") + s;
-  }
+  var URGENT_SEC = 1800;
 
   var C = window.KBCalc;
-  var client = KBData.createClient(function(){ return state.token; });
+  var $ = function(id){ return document.getElementById(id); };
+  var els = {
+    setup: $('screen-setup'), main: $('screen-main'),
+    tokenInput: $('tokenInput'), connectBtn: $('connectBtn'), setupStatus: $('setupStatus'),
+    leagueBtn: $('leagueBtn'), leagueName: $('leagueName'), refreshBtn: $('refreshBtn'), menuBtn: $('menuBtn'),
+    hero: $('hero'), heroBudget: $('heroBudget'), heroAfter: $('heroAfter'), heroRoom: $('heroRoom'),
+    heroSquad: $('heroSquad'), heroSub: $('heroSub'), alerts: $('alerts'), body: $('body'), nav: $('nav'),
+    sheet: $('sheet'), sheetBackdrop: $('sheetBackdrop')
+  };
 
-  function initialState(){
-    return {
-      token:null, tokenName:"", myUserId:null, leagues:[], currentLeague:null,
-      players:[], budget:0, actions:{},
-      market:[], buyActions:{},
-      opponents:[], opponentDetails:{}, openOpponent:null,
-      estimates:null, estimatesLoading:false, estimatesError:false, estimatesProgress:"",
-      matchday:0,
-      squadLimit:null, clubLimit:null, clubNames:{}, leagueOverview:null,
-      activeTab:'kader'
-    };
+  // ---------- Formatierung ----------
+  var currency = new Intl.NumberFormat('de-DE', {style:'currency', currency:'EUR', maximumFractionDigits:0});
+  function fmtMoney(n){ return currency.format(n || 0).replace('-', '−'); }
+  function short(n){
+    n = n || 0;
+    var a = Math.abs(n), s;
+    if (a >= 1e6) s = (a / 1e6).toFixed(a >= 1e8 ? 0 : 1).replace('.', ',') + ' Mio';
+    else if (a >= 1e3) s = Math.round(a / 1e3) + 'k';
+    else s = String(Math.round(a));
+    return (n < 0 ? '−' : '') + s;
   }
-  var state = initialState();
-
-  function show(screen){
-    els.setup.hidden = screen !== 'setup';
-    els.leagues.hidden = screen !== 'leagues';
-    els.squad.hidden = screen !== 'squad';
+  function delta(n){ n = n || 0; return (n >= 0 ? '+' : '−') + short(Math.abs(n)); }
+  function cls(n){ return (n || 0) >= 0 ? 'up' : 'dn'; }
+  function escapeHtml(s){
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
   }
+  function img(path){ return path ? IMG_BASE + path : ""; }
+  function countdown(sec){
+    if (sec == null) return "kein Zeitlimit";
+    if (sec <= 0) return "läuft ab";
+    var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60);
+    return h ? h + " Std " + m + " Min" : m + " Min";
+  }
+  var dateFmt = new Intl.DateTimeFormat('de-DE', {weekday:'short', hour:'2-digit', minute:'2-digit'});
 
+  // ---------- Token: Keychain (Scriptable) oder localStorage ----------
+  var bridge = !!window.__KP_SCRIPTABLE;
+  function readToken(){
+    if (window.__KP_TOKEN) return window.__KP_TOKEN;
+    try { return localStorage.getItem('kb_token'); } catch(e){ return null; }
+  }
+  function persistToken(t){
+    try { localStorage.setItem('kb_token', t); } catch(e){}
+    if (bridge) location.href = 'kaderplaner://token/' + encodeURIComponent(t);
+  }
+  function forgetToken(){
+    try { localStorage.removeItem('kb_token'); } catch(e){}
+    window.__KP_TOKEN = null;
+    if (bridge) location.href = 'kaderplaner://logout';
+  }
   function b64urlDecode(seg){
     seg = seg.replace(/-/g,'+').replace(/_/g,'/');
     while (seg.length % 4) seg += '=';
@@ -1051,717 +910,501 @@
       return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
     }).join(''));
   }
-
   function decodeToken(token){
     var parts = token.split('.');
     if (parts.length !== 3) return null;
-    try {
-      return JSON.parse(b64urlDecode(parts[1]));
-    } catch(e){ return null; }
+    try { return JSON.parse(b64urlDecode(parts[1])); } catch(e){ return null; }
   }
-
   function cleanToken(raw){
-    var t = (raw || "").trim();
-    t = t.replace(/^["']|["']$/g, "");
+    var t = (raw || "").trim().replace(/^["']|["']$/g, "");
     if (t.indexOf("Bearer ") === 0) t = t.slice(7).trim();
     return t;
   }
 
-  function headers(){
+  // ---------- State ----------
+  function initialState(){
     return {
-      "Authorization": "Bearer " + state.token,
-      "Accept": "application/json"
+      token:null, tokenName:"", myUserId:null, myImg:"", leagues:[], league:null,
+      budget:0, players:[], sell:{}, market:[], bids:{},
+      managers:[], overview:null, clubNames:{}, nextKickoff:null,
+      estimates:null, estLoading:false, estError:false, estProgress:"",
+      openManager:null, managerSquads:{}, tab:'kader', loading:false
     };
   }
+  var state = initialState();
+  var client = KBData.createClient(function(){ return state.token; });
 
-  function setStatus(el, msg, kind){
-    if (!msg){ el.innerHTML = ""; return; }
-    el.innerHTML = '<div class="status-msg ' + (kind || 'error') + '">' + msg + '</div>';
-  }
-
-  function playerImg(path){
-    return path ? (IMG_BASE + path) : "";
-  }
-
-  // ---------- Setup flow ----------
-  function tryStoredToken(){
-    var stored = null;
-    try { stored = localStorage.getItem('kb_token'); } catch(e){}
-    if (!stored) { show('setup'); return; }
-    var ok = applyToken(stored, true);
-    if (!ok) show('setup'); else loadLeagues();
+  function show(screen){
+    els.setup.hidden = screen !== 'setup';
+    els.main.hidden = screen !== 'main';
   }
 
   function applyToken(raw, silent){
     var token = cleanToken(raw);
     var payload = decodeToken(token);
-    if (!payload){
-      if (!silent) setStatus(els.setupStatus, "Der Token sieht nicht gültig aus — bitte den Wert aus <code>kb.t</code> komplett neu kopieren.", "error");
-      return false;
-    }
-    if (payload.exp && Date.now()/1000 > payload.exp){
-      if (!silent) setStatus(els.setupStatus, "Dieser Token ist abgelaufen. Bitte frisch bei play.kickbase.com/freibier einloggen und neu einfügen.", "error");
-      return false;
-    }
+    var fail = function(msg){ if (!silent) els.setupStatus.innerHTML = '<div class="status-msg">' + msg + '</div>'; return false; };
+    if (!payload) return fail("Der Token sieht nicht gültig aus. Bitte den Wert aus <code>kb.t</code> komplett neu kopieren.");
+    if (payload.exp && Date.now() / 1000 > payload.exp) return fail("Dieser Token ist abgelaufen. Bitte neu bei play.kickbase.com einloggen und den frischen Token einfügen.");
     state.token = token;
     state.tokenName = payload["kb.name"] || "";
-    state.myUserId = payload["kb.uid"] || null;
-    try { localStorage.setItem('kb_token', token); } catch(e){}
+    state.myUserId = payload["kb.uid"] != null ? String(payload["kb.uid"]) : null;
     return true;
   }
 
+  function start(){
+    var stored = readToken();
+    if (stored && applyToken(stored, true)) loadLeagues();
+    else show('setup');
+  }
+
   els.connectBtn.addEventListener('click', function(){
-    setStatus(els.setupStatus, "");
-    var raw = els.tokenInput.value;
-    if (!raw.trim()){
-      setStatus(els.setupStatus, "Bitte zuerst den Token einfügen.", "error");
+    els.setupStatus.innerHTML = "";
+    if (!els.tokenInput.value.trim()){
+      els.setupStatus.innerHTML = '<div class="status-msg">Bitte zuerst den Token einfügen.</div>';
       return;
     }
-    els.connectBtn.disabled = true;
-    els.connectBtn.textContent = "Verbinde …";
-    var ok = applyToken(raw, false);
-    if (!ok){
-      els.connectBtn.disabled = false;
-      els.connectBtn.textContent = "Verbinden";
-      return;
+    if (applyToken(els.tokenInput.value, false)){
+      persistToken(state.token);
+      loadLeagues();
     }
-    loadLeagues();
   });
 
-  els.logoutBtn.addEventListener('click', function(){
-    try { localStorage.removeItem('kb_token'); } catch(e){}
+  function logout(){
+    forgetToken();
     state = initialState();
     els.tokenInput.value = "";
-    els.connectBtn.disabled = false;
-    els.connectBtn.textContent = "Verbinden";
-    setStatus(els.setupStatus, "");
+    closeSheet();
     show('setup');
+  }
+
+  // ---------- Fehler ----------
+  function showError(err, retry){
+    if (err && err.auth){
+      els.body.innerHTML = '<div class="empty">Kickbase hat den Token abgelehnt, vermutlich ist er abgelaufen.<br><button class="link-btn" id="reAuth">Neuen Token eingeben</button></div>';
+      $('reAuth').addEventListener('click', logout);
+      return;
+    }
+    els.body.innerHTML = '<div class="empty">Verbindung zu Kickbase hat nicht geklappt.<br><button class="link-btn" id="retry">Erneut versuchen</button></div>';
+    $('retry').addEventListener('click', retry);
+  }
+
+  // ---------- Ligen ----------
+  function loadLeagues(){
+    show('main');
+    els.body.innerHTML = '<div class="spinner"></div>';
+    client.get("/leagues/selection").then(function(d){
+      state.leagues = (d && d.it) || [];
+      if (!state.leagues.length){ els.body.innerHTML = '<div class="empty">Keine Ligen gefunden.</div>'; return; }
+      var last = null;
+      try { last = localStorage.getItem('kp_league'); } catch(e){}
+      var l = state.leagues.filter(function(x){ return String(x.i) === last; })[0] || state.leagues[0];
+      openLeague(l);
+    }).catch(function(err){ showError(err, loadLeagues); });
+  }
+
+  function openLeague(l){
+    var keepTab = state.tab;
+    var keep = {token: state.token, tokenName: state.tokenName, myUserId: state.myUserId, leagues: state.leagues};
+    state = initialState();
+    Object.keys(keep).forEach(function(k){ state[k] = keep[k]; });
+    state.league = l;
+    state.tab = keepTab;
+    try { localStorage.setItem('kp_league', String(l.i)); } catch(e){}
+    els.leagueName.textContent = l.n || "Liga";
+    setTab(state.tab, true);
+    loadLeague();
+  }
+
+  function loadLeague(){
+    var l = state.league;
+    if (!l) return;
+    var id = l.i, cpi = l.cpi || 1;
+    state.loading = true;
+    els.refreshBtn.classList.add('spin');
+    if (!state.players.length) els.body.innerHTML = '<div class="spinner"></div>';
+    var opt = function(p){ return p.catch(function(){ return null; }); };
+    Promise.all([
+      client.get("/leagues/" + id + "/me"),
+      client.get("/leagues/" + id + "/squad"),
+      client.get("/leagues/" + id + "/market"),
+      client.get("/leagues/" + id + "/ranking"),
+      opt(client.get("/leagues/" + id + "/overview")),
+      opt(client.get("/competitions/" + cpi + "/table")),
+      state.myUserId ? opt(client.get("/leagues/" + id + "/managers/" + state.myUserId + "/performance")) : Promise.resolve(null)
+    ]).then(function(r){
+      if (state.league !== l) return;
+      var me = r[0], squad = r[1], market = r[2], ranking = r[3], ov = r[4], table = r[5], perf = r[6];
+      state.budget = me.b || 0;
+      state.overview = ov || {mppu: me.mppu, mpst: me.mpst, mgc: me.mgc, cpi: cpi};
+      var names = {};
+      ((table && table.it) || []).forEach(function(t){ if (t.tid) names[t.tid] = t.tn; });
+      state.clubNames = names;
+
+      state.players = ((squad && squad.it) || []).map(function(p){
+        return {
+          id: String(p.i || p.pi), name: p.n || p.pn || "Unbekannt", pos: POS_MAP[p.pos] || "–",
+          mv: p.mv || 0, gain: p.mvgl, day: p.tfhmvt, ap: p.ap, status: p.st || 0,
+          offers: p.ofc || 0, tid: p.tid, img: img(p.pim)
+        };
+      });
+
+      state.market = ((market && market.it) || []).map(function(p){
+        return {
+          id: String(p.i), name: (p.fn ? p.fn.charAt(0) + ". " : "") + (p.n || "Unbekannt"),
+          pos: POS_MAP[p.pos] || "–", mv: p.mv || 0, price: p.prc != null ? p.prc : (p.mv || 0),
+          expires: p.exs != null ? p.exs : null, loadedAt: Date.now(), status: p.st || 0,
+          bids: p.ofc || 0, by: p.u ? (p.u.n || "Manager") : null, byId: p.u ? String(p.u.i) : null,
+          tid: p.tid, ap: p.ap, img: img(p.pim)
+        };
+      });
+
+      state.managers = ((ranking && ranking.us) || []).map(function(u){
+        var isMe = state.myUserId && String(u.i) === state.myUserId;
+        if (isMe) state.myImg = img(u.uim);
+        return { id: String(u.i), name: u.n || "Manager", isMe: isMe, points: u.sp || 0, img: img(u.uim) };
+      });
+      els.menuBtn.style.backgroundImage = state.myImg ? 'url("' + state.myImg + '")' : '';
+
+      state.nextKickoff = null;
+      var season = perf && perf.it && perf.it[0];
+      ((season && season.it) || []).forEach(function(d){
+        var t = d.md ? Date.parse(d.md) : null;
+        if (t && t > Date.now() && (state.nextKickoff == null || t < state.nextKickoff)) state.nextKickoff = t;
+      });
+
+      state.loading = false;
+      els.refreshBtn.classList.remove('spin');
+      render();
+    }).catch(function(err){
+      state.loading = false;
+      els.refreshBtn.classList.remove('spin');
+      showError(err, loadLeague);
+    });
+  }
+
+  els.refreshBtn.addEventListener('click', function(){
+    if (state.loading) return;
+    state.estimates = null; state.estError = false; state.managerSquads = {};
+    loadLeague();
   });
 
-  // ---------- Leagues ----------
-  function loadLeagues(){
-    show('leagues');
-    els.tokenName.textContent = state.tokenName ? ("Angemeldet als " + state.tokenName) : "";
-    els.leaguesList.innerHTML = '<div class="spinner"></div>';
-
-    fetch(API + "/leagues/selection", {headers: headers()})
-      .then(handleResponse)
-      .then(function(data){
-        state.leagues = data.it || [];
-        renderLeagues();
-      })
-      .catch(function(err){ showFetchError(els.leaguesList, err, loadLeagues); });
-  }
-
-  function renderLeagues(){
-    if (!state.leagues.length){
-      els.leaguesList.innerHTML = '<div class="empty-state">Keine Ligen gefunden.</div>';
-      return;
-    }
-    els.leaguesList.innerHTML = "";
-    state.leagues.forEach(function(l){
-      var card = document.createElement('button');
-      card.className = 'league-card';
-      var img = l.lim ? playerImg(l.lim) : "";
-      card.innerHTML =
-        (img ? '<img class="league-avatar" src="' + img + '" alt="">' : '<div class="league-avatar"></div>') +
-        '<div class="league-info">' +
-          '<div class="name">' + escapeHtml(l.n || "Liga") + '</div>' +
-          '<div class="meta">' + (l.un != null ? l.un + " Manager" : "") + '</div>' +
-        '</div>' +
-        '<span class="chev">›</span>';
-      card.addEventListener('click', function(){ openLeague(l); });
-      els.leaguesList.appendChild(card);
+  // ---------- Tabs ----------
+  function setTab(tab, silent){
+    state.tab = tab;
+    Array.prototype.forEach.call(els.nav.querySelectorAll('button'), function(b){
+      b.className = b.getAttribute('data-tab') === tab ? 'on' : '';
     });
+    if (!silent){ render(); window.scrollTo(0, 0); }
+  }
+  els.nav.addEventListener('click', function(e){
+    var t = e.target.getAttribute && e.target.getAttribute('data-tab');
+    if (t) setTab(t);
+  });
+
+  function render(){
+    if (!state.league || state.loading && !state.players.length) return;
+    renderHero();
+    if (state.tab === 'kader') renderSquad();
+    else if (state.tab === 'markt') renderMarket();
+    else renderManagers();
   }
 
-  els.backBtn.addEventListener('click', function(){ show('leagues'); });
-
-  // ---------- Squad ----------
-  function openLeague(l){
-    state.currentLeague = l;
-    state.actions = {};
-    state.buyActions = {};
-    state.opponents = [];
-    state.opponentDetails = {};
-    state.openOpponent = null;
-    state.estimates = null;
-    state.estimatesLoading = false;
-    state.estimatesError = false;
-    state.squadLimit = null;
-    state.clubLimit = null;
-    state.clubNames = {};
-    state.leagueOverview = null;
-    state.activeTab = 'kader';
-    setActiveTab('kader');
-    els.squadLeagueName.textContent = l.n || "Liga";
-    els.squadMeta.textContent = "Lade Kader …";
-    show('squad');
-    els.squadBody.innerHTML = '<div class="spinner"></div>';
-    loadSquad();
-  }
-
-  els.refreshBtn.addEventListener('click', loadSquad);
-  els.tabKader.addEventListener('click', function(){ setActiveTab('kader'); renderActiveTab(); });
-  els.tabMarkt.addEventListener('click', function(){ setActiveTab('markt'); renderActiveTab(); });
-  els.tabGegner.addEventListener('click', function(){ setActiveTab('gegner'); renderActiveTab(); });
-
-  function setActiveTab(tab){
-    state.activeTab = tab;
-    els.tabKader.className = tab === 'kader' ? 'active' : '';
-    els.tabMarkt.className = tab === 'markt' ? 'active' : '';
-    els.tabGegner.className = tab === 'gegner' ? 'active' : '';
-  }
-
-  function renderActiveTab(){
-    if (state.activeTab === 'kader') renderSquad();
-    else if (state.activeTab === 'markt') renderMarket();
-    else renderGegner();
-  }
-
-  function loadSquad(){
-    if (!state.currentLeague) return;
-    var id = state.currentLeague.i;
-    els.squadMeta.textContent = "Lade Daten …";
-    els.squadBody.innerHTML = '<div class="spinner"></div>';
-
-    var cpi = state.currentLeague.cpi || 1;
-
-    Promise.all([
-      fetch(API + "/leagues/" + id + "/me", {headers: headers()}).then(handleResponse),
-      fetch(API + "/leagues/" + id + "/squad", {headers: headers()}).then(handleResponse),
-      fetch(API + "/leagues/" + id + "/market", {headers: headers()}).then(handleResponse),
-      fetch(API + "/leagues/" + id + "/ranking", {headers: headers()}).then(handleResponse),
-      fetch(API + "/leagues/" + id + "/overview", {headers: headers()}).then(handleResponse).catch(function(){ return null; }),
-      fetch(API + "/competitions/" + cpi + "/table", {headers: headers()}).then(handleResponse).catch(function(){ return null; })
-    ]).then(function(results){
-      var me = results[0], squad = results[1], market = results[2], ranking = results[3], overview = results[4], table = results[5];
-
-      state.budget = me.b || 0;
-
-      if (overview){
-        state.leagueOverview = overview;
-        state.squadLimit = overview.mppu || null;
-        state.clubLimit = overview.mpst || null;
-      }
-      if (table && table.it){
-        var names = {};
-        table.it.forEach(function(t){ if (t.tid) names[t.tid] = t.tn || ("Verein " + t.tid); });
-        state.clubNames = names;
-      }
-
-      var raw = squad.it || (Array.isArray(squad) ? squad : []);
-      state.players = raw.map(function(p){
-        return {
-          id: p.i,
-          name: p.n || "Unbekannt",
-          pos: POS_MAP[p.pos] || "UNK",
-          mv: p.mv || 0,
-          delta: p.mvgl || 0,
-          tid: p.tid || null,
-          img: playerImg(p.pim)
-        };
-      });
-
-      state.matchday = market.day || 0;
-
-      state.market = (market.it || []).map(function(p){
-        return {
-          id: p.i,
-          name: ((p.fn ? p.fn.charAt(0) + ". " : "") + (p.n || "Unbekannt")),
-          pos: POS_MAP[p.pos] || "UNK",
-          price: (p.prc != null ? p.prc : p.mv) || 0,
-          mv: p.mv || 0,
-          // Managerangebote (p.u vorhanden) haben laut Kickbase-API kein exs-Feld -
-          // keine Frist, kein "läuft ab". null statt 0, sonst wirkt es faelschlich dringend.
-          expiresIn: (p.exs != null ? p.exs : null),
-          status: p.st || 0,
-          offerBy: p.u ? (p.u.n || "Manager") : null,
-          tid: p.tid || null,
-          img: playerImg(p.pim)
-        };
-      });
-
-      state.opponents = (ranking.us || []).map(function(u){
-        return {
-          id: u.i,
-          name: u.n || "Manager",
-          isMe: state.myUserId && String(u.i) === String(state.myUserId),
-          // Achtung: tv im Ranking ist nur der Wert der aufgestellten Elf. Der echte
-          // Kaderwert kommt aus /managers/{uid}/dashboard (siehe KBData.estimateAll).
-          lineupValue: u.tv || 0,
-          points: u.sp || 0,
-          lineup: u.lp || [],
-          img: playerImg(u.uim)
-        };
-      });
-
-      els.squadMeta.textContent = state.players.length + " Spieler · " + state.market.length + " im Transfermarkt";
-      renderActiveTab();
-    }).catch(function(err){ showFetchError(els.squadBody, err, loadSquad); });
-  }
-
-  function renderSquad(){
-    var byPos = {};
-    POS_ORDER.forEach(function(p){ byPos[p] = []; });
-    var extra = [];
+  // ---------- Planung (Kopfbereich) ----------
+  function plan(){
+    var sold = 0, keptValue = 0, kept = [];
     state.players.forEach(function(p){
-      if (byPos[p.pos]) byPos[p.pos].push(p); else extra.push(p);
+      if (state.sell[p.id]) sold += p.mv; else { keptValue += p.mv; kept.push(p); }
     });
-
-    var html = "";
-    POS_ORDER.forEach(function(pos){
-      var list = byPos[pos];
-      if (!list.length) return;
-      html += '<div class="pos-header">' + POS_LABEL[pos] + '<span class="count">' + list.length + '</span></div>';
-      html += '<div class="players">';
-      list.forEach(function(p){ html += playerCardHtml(p); });
-      html += '</div>';
-    });
-    if (extra.length){
-      html += '<div class="pos-header">Weitere<span class="count">' + extra.length + '</span></div><div class="players">';
-      extra.forEach(function(p){ html += playerCardHtml(p); });
-      html += '</div>';
-    }
-    els.squadBody.innerHTML = html || '<div class="empty-state">Keine Spieler im Kader.</div>';
-
-    // wire toggles
-    state.players.forEach(function(p){
-      var holdBtn = document.getElementById('hold-' + p.id);
-      var sellBtn = document.getElementById('sell-' + p.id);
-      if (holdBtn) holdBtn.addEventListener('click', function(){ setAction(p.id, 'hold'); });
-      if (sellBtn) sellBtn.addEventListener('click', function(){ setAction(p.id, 'sell'); });
-    });
-
-    updateSummary();
-  }
-
-  function playerCardHtml(p){
-    var isSell = state.actions[p.id] === 'sell';
-    var deltaClass = p.delta >= 0 ? 'pos' : 'neg';
-    return (
-      '<div class="player-card">' +
-        (p.img ? '<img class="player-photo" src="' + p.img + '" alt="">' : '<div class="player-photo"></div>') +
-        '<div class="player-main">' +
-          '<div class="player-name">' + escapeHtml(p.name) + '</div>' +
-          '<div class="player-sub">' +
-            '<span class="player-mv mono">' + fmtMoney(p.mv) + '</span>' +
-            '<span class="player-delta ' + deltaClass + '">' + fmtDelta(p.delta) + '</span>' +
-          '</div>' +
-        '</div>' +
-        '<div class="toggle">' +
-          '<button id="hold-' + p.id + '" class="' + (isSell ? '' : 'active-hold') + '">Halten</button>' +
-          '<button id="sell-' + p.id + '" class="' + (isSell ? 'active-sell' : '') + '">Verkaufen</button>' +
-        '</div>' +
-      '</div>'
-    );
-  }
-
-  function setAction(id, action){
-    if (action === 'hold') delete state.actions[id];
-    else state.actions[id] = 'sell';
-
-    var holdBtn = document.getElementById('hold-' + id);
-    var sellBtn = document.getElementById('sell-' + id);
-    if (holdBtn) holdBtn.className = action === 'hold' ? 'active-hold' : '';
-    if (sellBtn) sellBtn.className = action === 'sell' ? 'active-sell' : '';
-    updateSummary();
-  }
-
-  function updateSummary(){
-    var erlos = 0;
-    state.players.forEach(function(p){
-      if (state.actions[p.id] === 'sell') erlos += p.mv;
-    });
-    var ausgaben = 0;
+    var bids = 0, bought = [];
     state.market.forEach(function(p){
-      if (state.buyActions[p.id]) ausgaben += p.price;
+      if (state.bids[p.id] != null){ bids += state.bids[p.id]; bought.push(p); }
     });
-    var netto = erlos - ausgaben;
-    var neu = state.budget + netto;
-    els.sumBudget.textContent = fmtMoney(state.budget);
-    els.sumBudget.className = "val mono " + (state.budget < 0 ? "neg" : "");
-    els.sumErlos.textContent = (netto > 0 ? "+" : (netto < 0 ? "" : "")) + fmtMoney(netto);
-    els.sumErlos.className = "val mono " + (netto < 0 ? "neg" : (netto > 0 ? "pos" : ""));
-    els.sumNeu.textContent = fmtMoney(neu);
-    els.sumNeu.className = "val mono " + (neu < 0 ? "neg" : "pos");
-
-    // Verkaeufe an Kickbase sind sofort gebucht (Konto +MW, Teamwert -MW);
-    // vorgemerkte Kaeufe zaehlen wie offene Gebote.
-    var teamValue = 0;
-    state.players.forEach(function(p){
-      if (state.actions[p.id] !== 'sell') teamValue += p.mv;
-    });
-    var room = C.bidRoom(teamValue, state.budget + erlos, ausgaben);
-    if (room.headroom >= 0){
-      els.sumLimit.className = "limit-line ok";
-      els.sumLimit.textContent = "33%-Regel: noch " + fmtMoney(room.headroom) + " Spielraum bis zum Minus-Limit (" + fmtMoney(room.maxNegative) + ")";
-    } else {
-      els.sumLimit.className = "limit-line warn";
-      els.sumLimit.textContent = "33%-Regel: über dem Minus-Limit von " + fmtMoney(room.maxNegative) + " um " + fmtMoney(Math.abs(room.headroom));
-    }
-
-    updateConstraintWarnings();
+    // Verkaeufe an Kickbase sind sofort gebucht; Gebote zaehlen als offen.
+    var room = C.bidRoom(keptValue, state.budget + sold, bids);
+    return {
+      sold: sold, bids: bids, after: state.budget + sold - bids, room: room,
+      squadSize: kept.length + bought.length, kept: kept, bought: bought
+    };
   }
 
-  // Prueft Kaderlimit (max. Kadergroesse) und Vereinslimit (max. Spieler je Klub)
-  // gegen die aktuell simulierten Halten/Verkaufen/Kaufen-Entscheidungen. Die
-  // 33%-Regel allein reicht nicht - Kickbase lehnt einen Kauf auch ab, wenn er
-  // diese beiden Grenzen sprengt, selbst bei ausreichendem Kontostand.
-  function updateConstraintWarnings(){
-    var kept = state.players.filter(function(p){ return state.actions[p.id] !== 'sell'; });
-    var bought = state.market.filter(function(p){ return !!state.buyActions[p.id]; });
-    var warnings = [];
+  function renderHero(){
+    var p = plan(), limit = state.overview && state.overview.mppu;
+    els.heroBudget.textContent = fmtMoney(state.budget);
+    els.heroAfter.textContent = short(p.after);
+    els.heroRoom.textContent = short(p.room.headroom);
+    els.heroSquad.textContent = p.squadSize + (limit ? "/" + limit : "");
+    els.hero.className = 'hero' + (p.room.headroom < 0 ? ' neg' : '');
+    var sub = [];
+    if (p.sold || p.bids) sub.push((p.sold ? 'Verkauf +' + short(p.sold) : '') + (p.sold && p.bids ? ' · ' : '') + (p.bids ? 'Gebote ' + short(p.bids) : ''));
+    sub.push('Minus-Grenze ' + short(p.room.maxNegative));
+    if (state.nextKickoff) sub.push('Anpfiff ' + dateFmt.format(new Date(state.nextKickoff)));
+    els.heroSub.textContent = sub.join(' · ');
 
-    if (state.squadLimit != null){
-      var size = kept.length + bought.length;
-      if (size > state.squadLimit){
-        warnings.push("Kaderlimit " + state.squadLimit + " überschritten (" + size + " Spieler nach dieser Auswahl)");
-      }
-    }
-
-    if (state.clubLimit != null){
+    var alerts = [];
+    if (p.room.headroom < 0) alerts.push(['', 'Über der 33%-Grenze um ' + short(-p.room.headroom) + '. Kickbase lehnt weitere Gebote ab.']);
+    if (p.after < 0) alerts.push(['warn', 'Kontostand nach Plan im Minus. Steht er bei Anpfiff unter null, gibt es 0 Punkte für den Spieltag.']);
+    if (limit && p.squadSize > limit) alerts.push(['', 'Kaderlimit ' + limit + ' überschritten (' + p.squadSize + ' Spieler).']);
+    if (p.squadSize < 11) alerts.push(['warn', 'Nur ' + p.squadSize + ' Spieler. Jeder leere Aufstellungsplatz kostet 100 Punkte.']);
+    var clubLimit = state.overview && state.overview.mpst;
+    if (clubLimit){
       var byClub = {};
-      kept.concat(bought).forEach(function(p){
-        if (!p.tid) return;
-        byClub[p.tid] = (byClub[p.tid] || 0) + 1;
-      });
+      p.kept.concat(p.bought).forEach(function(x){ if (x.tid) byClub[x.tid] = (byClub[x.tid] || 0) + 1; });
       Object.keys(byClub).forEach(function(tid){
-        if (byClub[tid] > state.clubLimit){
-          var name = state.clubNames[tid] || ("Verein " + tid);
-          warnings.push("Vereinslimit " + state.clubLimit + " überschritten: " + name + " (" + byClub[tid] + " Spieler)");
-        }
+        if (byClub[tid] > clubLimit) alerts.push(['', (state.clubNames[tid] || 'Verein ' + tid) + ': ' + byClub[tid] + ' Spieler, erlaubt sind ' + clubLimit + '.']);
       });
     }
-
-    if (warnings.length){
-      els.sumConstraints.hidden = false;
-      els.sumConstraints.textContent = warnings.join(" · ");
-    } else {
-      els.sumConstraints.hidden = true;
-      els.sumConstraints.textContent = "";
-    }
+    els.alerts.innerHTML = alerts.map(function(a){ return '<div class="alert ' + a[0] + '">' + escapeHtml(a[1]) + '</div>'; }).join('');
   }
 
-  // ---------- Transfermarkt ----------
-  function renderMarket(){
-    if (!state.market.length){
-      els.squadBody.innerHTML = '<div class="empty-state">Aktuell keine Spieler im Transfermarkt.</div>';
-      return;
-    }
-    // Freie Marktspieler (kein Angebot eines Managers) zuerst, sortiert nach
-    // Ablaufzeit; Spieler, die von einem Manager angeboten werden, danach —
-    // ebenfalls nach Ablaufzeit sortiert.
-    var free = [], offers = [];
-    state.market.forEach(function(p){ (p.offerBy ? offers : free).push(p); });
-    var byExpiry = function(a, b){ return (a.expiresIn || 0) - (b.expiresIn || 0); };
-    free.sort(byExpiry);
-    offers.sort(byExpiry);
+  function photo(p){
+    return '<div class="ph"' + (p.img ? ' style="background-image:url(\'' + p.img + '\')"' : '') + '><i>' + p.pos + '</i></div>';
+  }
 
-    var html = '<div class="pos-header">Läuft bald ab zuerst<span class="count">' + free.length + '</span></div>';
-    html += '<div class="players">';
-    free.forEach(function(p){ html += marketCardHtml(p); });
-    html += '</div>';
-    if (offers.length){
-      html += '<div class="pos-header">Manager-Angebote<span class="count">' + offers.length + '</span></div>';
-      html += '<div class="players">';
-      offers.forEach(function(p){ html += marketCardHtml(p); });
-      html += '</div>';
-    }
-    els.squadBody.innerHTML = html;
-
-    state.market.forEach(function(p){
-      var buyBtn = document.getElementById('buy-' + p.id);
-      if (buyBtn) buyBtn.addEventListener('click', function(){ toggleBuy(p.id); });
+  // ---------- Kader ----------
+  function renderSquad(){
+    if (!state.players.length){ els.body.innerHTML = '<div class="empty">Keine Spieler im Kader.</div>'; return; }
+    var html = "";
+    POS_ORDER.concat(["–"]).forEach(function(pos){
+      var list = state.players.filter(function(p){ return p.pos === pos; });
+      if (!list.length) return;
+      list.sort(function(a, b){ return b.mv - a.mv; });
+      var value = list.reduce(function(s, p){ return s + p.mv; }, 0);
+      html += '<div class="ttl"><b>' + (POS_LABEL[pos] || 'Weitere') + '</b><span>' + list.length + ' Spieler · ' + short(value) + '</span></div>';
+      list.forEach(function(p){
+        var sold = !!state.sell[p.id];
+        var meta = [];
+        if (p.gain != null) meta.push('<span class="' + cls(p.gain) + '">' + delta(p.gain) + ' seit Kauf</span>');
+        if (p.ap != null) meta.push('<span>Ø ' + p.ap + ' P</span>');
+        if (p.offers) meta.push('<span class="tag hot">' + p.offers + ' Angebot' + (p.offers > 1 ? 'e' : '') + '</span>');
+        html += '<div class="card' + (sold ? ' sold' : '') + '">' + photo(p) +
+          '<div class="mid"><div class="n">' + escapeHtml(p.name) + (p.status ? ' <span class="dot" title="Status beachten"></span>' : '') + '</div><div class="m">' + meta.join('') + '</div></div>' +
+          '<div class="rt"><b class="mono">' + short(p.mv) + '</b>' + (p.day != null ? '<small class="mono ' + cls(p.day) + '">' + delta(p.day) + '</small>' : '') + '</div>' +
+          '<button class="act' + (sold ? ' sell' : '') + '" data-sell="' + p.id + '">' + (sold ? 'Verkauft' : 'Verkaufen') + '</button></div>';
+      });
+    });
+    els.body.innerHTML = html;
+    Array.prototype.forEach.call(els.body.querySelectorAll('[data-sell]'), function(b){
+      b.addEventListener('click', function(){
+        var id = b.getAttribute('data-sell');
+        if (state.sell[id]) delete state.sell[id]; else state.sell[id] = true;
+        render();
+      });
     });
   }
 
-  function fmtExpiry(sec){
-    if (sec == null) return "kein Zeitlimit";
-    if (sec <= 0) return "läuft ab";
-    var h = Math.floor(sec / 3600);
-    var m = Math.floor((sec % 3600) / 60);
-    if (h > 0) return h + " Std " + m + " Min";
-    return m + " Min";
+  // ---------- Markt ----------
+  function remaining(p){
+    return p.expires == null ? null : p.expires - Math.round((Date.now() - p.loadedAt) / 1000);
   }
 
-  function marketCardHtml(p){
-    var isBuy = !!state.buyActions[p.id];
-    var urgent = p.expiresIn != null && p.expiresIn > 0 && p.expiresIn < 1800;
-    return (
-      '<div class="player-card">' +
-        (p.img ? '<img class="player-photo" src="' + p.img + '" alt="">' : '<div class="player-photo"></div>') +
-        '<div class="player-main">' +
-          '<div class="player-name"><span class="pos-pill" style="margin-right:6px;">' + p.pos + '</span>' + escapeHtml(p.name) + (p.status ? ' <span class="status-dot" title="Status beachten"></span>' : '') + '</div>' +
-          '<div class="player-sub">' +
-            '<span class="player-mv mono">' + fmtMoney(p.price) + '</span>' +
-            '<span class="expiry" style="' + (urgent ? 'color:var(--sell); font-weight:700;' : '') + '">' + fmtExpiry(p.expiresIn) + '</span>' +
-          '</div>' +
-          (p.offerBy ? '<div class="expiry">Angebot von ' + escapeHtml(p.offerBy) + ' — Forderung, kein Festpreis, oft verhandelbar</div>' : '') +
-        '</div>' +
-        '<button id="buy-' + p.id + '" class="buy-btn ' + (isBuy ? 'active-buy' : '') + '">' + (isBuy ? 'Vorgemerkt' : 'Kaufen') + '</button>' +
-      '</div>'
-    );
-  }
-
-  function toggleBuy(id){
-    if (state.buyActions[id]) delete state.buyActions[id];
-    else state.buyActions[id] = true;
-    var btn = document.getElementById('buy-' + id);
-    var isBuy = !!state.buyActions[id];
-    if (btn){
-      btn.className = 'buy-btn ' + (isBuy ? 'active-buy' : '');
-      btn.textContent = isBuy ? 'Vorgemerkt' : 'Kaufen';
+  function renderMarket(){
+    if (!state.market.length){ els.body.innerHTML = '<div class="empty">Gerade steht niemand auf dem Transfermarkt.</div>'; return; }
+    var free = state.market.filter(function(p){ return !p.by; });
+    var offers = state.market.filter(function(p){ return p.by; });
+    free.sort(function(a, b){ return (a.expires || 0) - (b.expires || 0); });
+    offers.sort(function(a, b){ return (a.price / a.mv) - (b.price / b.mv); });
+    var html = '';
+    if (free.length){
+      html += '<div class="ttl"><b>Transfermarkt</b><span>läuft zuerst ab</span></div>';
+      free.forEach(function(p){ html += marketCard(p); });
     }
-    updateSummary();
+    if (offers.length){
+      html += '<div class="ttl"><b>Von Managern</b><span>Forderung, oft verhandelbar</span></div>';
+      offers.forEach(function(p){ html += marketCard(p); });
+    }
+    els.body.innerHTML = html;
+    Array.prototype.forEach.call(els.body.querySelectorAll('[data-buy]'), function(b){
+      b.addEventListener('click', function(){
+        var id = b.getAttribute('data-buy');
+        var p = state.market.filter(function(x){ return x.id === id; })[0];
+        if (state.bids[id] != null) delete state.bids[id]; else state.bids[id] = p.price;
+        render();
+      });
+    });
+    Array.prototype.forEach.call(els.body.querySelectorAll('[data-bid]'), function(inp){
+      inp.addEventListener('change', function(){
+        var v = parseInt(inp.value.replace(/[^0-9]/g, ''), 10);
+        if (!isNaN(v)) state.bids[inp.getAttribute('data-bid')] = v;
+        renderHero();
+        inp.value = (state.bids[inp.getAttribute('data-bid')] || 0).toLocaleString('de-DE');
+      });
+    });
+  }
+
+  function marketCard(p){
+    var marked = state.bids[p.id] != null;
+    var left = remaining(p);
+    var meta = [];
+    if (p.by){
+      var pct = p.mv ? Math.round((p.price / p.mv - 1) * 100) : 0;
+      meta.push('<span>' + escapeHtml(p.by) + '</span>');
+      meta.push('<span class="tag' + (pct > 10 ? ' bad' : '') + '">' + (pct >= 0 ? '+' : '') + pct + ' % zum MW</span>');
+    } else {
+      meta.push('<span class="tag' + (left != null && left < URGENT_SEC ? ' hot' : '') + '">' + countdown(left) + '</span>');
+      if (state.nextKickoff && left != null && Date.now() + left * 1000 > state.nextKickoff) meta.push('<span class="tag bad">nach Anpfiff</span>');
+    }
+    if (p.bids) meta.push('<span class="tag">' + p.bids + ' Gebot' + (p.bids > 1 ? 'e' : '') + '</span>');
+    if (p.ap != null) meta.push('<span>Ø ' + p.ap + ' P</span>');
+    var club = state.clubNames[p.tid];
+    var html = '<div class="card' + (marked ? ' bought' : '') + '"' + (marked ? ' style="border-radius:16px 16px 0 0;margin-bottom:0"' : '') + '>' + photo(p) +
+      '<div class="mid"><div class="n">' + escapeHtml(p.name) + (p.status ? ' <span class="dot" title="Status beachten"></span>' : '') + '</div><div class="m">' + meta.join('') + '</div></div>' +
+      '<div class="rt"><b class="mono">' + short(p.price) + '</b>' + (club ? '<small style="color:var(--mut)">' + escapeHtml(club) + '</small>' : '') + '</div>' +
+      '<button class="act' + (marked ? ' buy' : '') + '" data-buy="' + p.id + '">' + (marked ? 'Vorgemerkt' : 'Bieten') + '</button></div>';
+    if (marked){
+      html += '<div class="bid">Gebot <input data-bid="' + p.id + '" inputmode="numeric" value="' + state.bids[p.id].toLocaleString('de-DE') + '"> €</div>';
+    }
+    return html;
   }
 
   // ---------- Gegner ----------
-  function renderGegner(){
-    if (!state.opponents.length){
-      els.squadBody.innerHTML = '<div class="empty-state">Keine Manager gefunden.</div>';
-      return;
-    }
-    if (!state.estimates && !state.estimatesLoading && !state.estimatesError){
-      loadEstimates();
-    }
+  function loadEstimates(){
+    var l = state.league;
+    state.estLoading = true;
+    state.estProgress = "";
+    KBData.estimateAll({
+      client: client, league: l, overview: state.overview,
+      managers: state.managers.map(function(m){ return {id: m.id, name: m.name}; }),
+      myUserId: state.myUserId, myBudget: state.budget,
+      onProgress: function(msg){
+        if (state.league !== l) return;
+        state.estProgress = msg;
+        var el = $('estProgress');
+        if (el) el.textContent = msg;
+      }
+    }).then(function(res){
+      if (state.league !== l) return;
+      state.estimates = res; state.estLoading = false;
+      if (state.tab === 'gegner') render();
+    }).catch(function(err){
+      if (state.league !== l) return;
+      state.estLoading = false; state.estError = true;
+      if (err && err.auth) return showError(err, loadEstimates);
+      if (state.tab === 'gegner') render();
+    });
+  }
 
-    var html = '';
+  function managerRows(){
     var est = state.estimates;
-    var check = '';
+    return state.managers.map(function(m){
+      var e = est && est.byUser[m.id];
+      if (!e) return {m: m};
+      var lo = m.isMe ? state.budget : e.estimate.low;
+      var hi = m.isMe ? state.budget : e.estimate.high;
+      var mid = m.isMe ? state.budget : e.estimate.mid;
+      var full = e.freeSlots === 0;
+      var power = function(b){ return full ? 0 : Math.max(0, C.bidRoom(e.teamValue, b).headroom); };
+      return {m: m, e: e, lo: lo, hi: hi, mid: mid, full: full, power: power(mid), powerLo: power(lo), powerHi: power(hi)};
+    });
+  }
+
+  function renderManagers(){
+    if (!state.estimates && !state.estLoading && !state.estError) loadEstimates();
+    var est = state.estimates;
+    var html = '<details class="info"><summary>So wird gerechnet</summary>' +
+      '<p>Kickbase verrät die Kontostände der anderen nicht. Die App rechnet sie nach: Startbudget, alle Käufe und Verkäufe seit Ligastart, MVP-Auto-Verkäufe, ' +
+      fmtMoney(est ? est.pointValue : 1000) + ' je Saisonpunkt, Erfolgsprämien (Spieltagssiege, Punkteschwellen, starke Spieler, Transfers, Gewinne) und die tägliche Auflaufprämie.</p>' +
+      '<p>Unsicher ist vor allem die Auflaufprämie. Daher die Spanne: oben bei täglichem Login, unten nur an Tagen mit Transfers.</p>' +
+      '<p><b>Bietkraft</b> = Kontostand plus Spielraum bis zur 33%-Grenze. Wer keinen Kaderplatz frei hat, kann nicht mitbieten.</p>';
     if (est && est.check){
       var off = Math.abs(est.check.diff);
-      check = ' Prüfstein: Für dich selbst ergibt dieselbe Rechnung ' + fmtMoney(est.check.estimate) +
-        ', dein echter Kontostand ist ' + fmtMoney(est.check.real) + ' (Abweichung ' + fmtMoney(off) + ').' +
-        (off > 1000000 ? ' Die Abweichung ist groß — die Gegnerwerte sind mit Vorsicht zu lesen.' : '');
+      html += '<p class="check' + (off > 1e6 ? ' bad' : '') + '">Gegenprobe an deinem Konto: gerechnet ' + fmtMoney(est.check.estimate) + ', echt ' + fmtMoney(est.check.real) + ' (Abweichung ' + short(off) + ').</p>';
     }
-    html += '<div class="bonus-box">' +
-      '<div class="bonus-box-title">Geschätzter Kontostand — so wird gerechnet</div>' +
-      '<div class="expiry">Startbudget + alle Käufe und Verkäufe seit Ligastart + MVP-Auto-Verkäufe + Punkteprämie (' +
-        fmtMoney(est ? est.pointValue : 1000) + ' je Saisonpunkt' + (est && est.pointValueCalibrated ? ', an deinem Konto geeicht' : '') +
-        ') + Erfolgsprämien (Spieltagssiege, Punkteschwellen, Spielerpunkte, Transfers, Gewinne) + tägliche Auflaufprämie. ' +
-        'Die Spanne kommt von der Auflaufprämie: oben bei täglichem Login, unten nur an Tagen mit Transfers.' + check + '</div>' +
-    '</div>';
+    html += '</details>';
 
-    var list = state.opponents.slice();
-    if (est){
-      list.sort(function(a, b){ return bidPower(b) - bidPower(a); });
-    }
-    html += '<div class="players" style="padding-top:10px;">';
-    list.forEach(function(o){ html += opponentCardHtml(o); });
-    html += '</div>';
-    html += '<p class="footer-note">' + (
-      state.estimatesLoading ? escapeHtml(state.estimatesProgress || 'Berechne Kontostände …')
-      : state.estimatesError ? 'Kontostände konnten nicht berechnet werden. <button class="link-btn" id="retryEst">Erneut versuchen</button>'
-      : 'Sortiert nach Bietkraft: geschätzter Kontostand + Spielraum bis zur 33%-Grenze. Wer keinen freien Kaderplatz hat, kann nicht mitbieten.'
-    ) + '</p>';
-    els.squadBody.innerHTML = html;
-
-    var retry = document.getElementById('retryEst');
-    if (retry) retry.addEventListener('click', function(){ state.estimatesError = false; renderGegner(); });
-    state.opponents.forEach(function(o){
-      var head = document.getElementById('opphead-' + o.id);
-      if (head) head.addEventListener('click', function(){ toggleOpponent(o.id); });
-    });
-  }
-
-  function loadEstimates(){
-    if (!state.currentLeague) return;
-    state.estimatesLoading = true;
-    var league = state.currentLeague;
-    var overviewPromise = state.leagueOverview
-      ? Promise.resolve(state.leagueOverview)
-      : client.get("/leagues/" + league.i + "/overview");
-    overviewPromise.then(function(ov){
-      state.leagueOverview = ov;
-      return KBData.estimateAll({
-        client: client, league: league, overview: ov,
-        managers: state.opponents.map(function(o){ return {id: o.id, name: o.name}; }),
-        myUserId: state.myUserId, myBudget: state.budget,
-        onProgress: function(msg){
-          state.estimatesProgress = msg;
-          if (state.activeTab === 'gegner' && state.currentLeague === league) renderGegner();
-        }
-      });
-    }).then(function(res){
-      if (state.currentLeague !== league) return;
-      state.estimates = res;
-      state.estimatesLoading = false;
-      if (state.activeTab === 'gegner') renderGegner();
-    }).catch(function(err){
-      if (state.currentLeague !== league) return;
-      state.estimatesLoading = false;
-      state.estimatesError = true;
-      if (err && err.auth){ showFetchError(els.squadBody, err, null); return; }
-      if (state.activeTab === 'gegner') renderGegner();
-    });
-  }
-
-  function estimateFor(o){
-    return state.estimates && state.estimates.byUser[String(o.id)] || null;
-  }
-
-  // Bietkraft = Kontostand + Spielraum bis zur 33%-Grenze; ohne freien Platz 0.
-  function bidPower(o){
-    var e = estimateFor(o);
-    if (!e) return -Infinity;
-    if (e.freeSlots === 0) return 0;
-    var budget = o.isMe ? state.budget : e.estimate.mid;
-    return Math.max(0, C.bidRoom(e.teamValue, budget).headroom);
-  }
-
-  function opponentCardHtml(o){
-    var isOpen = state.openOpponent === o.id;
-    var body = "";
-    if (isOpen){
-      var detail = state.opponentDetails[o.id];
-      if (!detail){
-        body = '<div class="spinner" style="margin:16px auto;"></div>';
-        loadOpponentDetail(o);
-      } else if (detail.error){
-        body = '<div class="opp-lineup"><span class="expiry">Kader konnte nicht geladen werden.</span></div>';
-      } else {
-        body = '<div class="opp-lineup"><div class="opp-lineup-title">Aktueller Kader (' + detail.length + ')</div>';
-        detail.forEach(function(pl){
-          var trendClass = pl.trend >= 0 ? 'pos' : 'neg';
-          body +=
-            '<div class="opp-player">' +
-              '<div class="row-top">' +
-                '<span class="pos-pill">' + pl.pos + '</span>' +
-                '<span class="name">' + escapeHtml(pl.name) + (pl.status ? ' <span class="status-dot" title="Status beachten"></span>' : '') + '</span>' +
-              '</div>' +
-              '<div class="row-bottom">' +
-                '<span class="mv mono">' + fmtMoney(pl.mv) + '</span>' +
-                '<span class="trend ' + trendClass + '">' + fmtDelta(pl.trend) + '</span>' +
-                '<span class="pts">' + (pl.avgPoints != null ? pl.avgPoints : '–') + ' ⌀P</span>' +
-              '</div>' +
-              (pl.purchasePrice != null ? '<div class="row-bottom"><span class="expiry">Kaufpreis: ' + fmtMoney(pl.purchasePrice) + ' · ' + fmtDelta(pl.mv - pl.purchasePrice) + ' seit Kauf</span></div>' : '') +
-            '</div>';
-        });
-        body += '</div>';
-      }
-    }
-
-    var e = estimateFor(o);
-    var lines = "";
-    if (e){
-      var teamLine = fmtMoney(e.teamValue) + ' Kaderwert · ' + e.squadSize + ' Spieler' +
-        (e.freeSlots != null ? ' · ' + (e.freeSlots === 0 ? 'kein Platz frei' : e.freeSlots + ' frei') : '');
-      var budget = o.isMe ? state.budget : e.estimate.mid;
-      var room = C.bidRoom(e.teamValue, budget);
-      var budgetText = o.isMe
-        ? fmtMoney(state.budget) + ' Kontostand (echt)'
-        : '≈ ' + fmtMoney(e.estimate.low) + ' bis ' + fmtMoney(e.estimate.high) + ' Kontostand';
-      var below = !o.isMe && e.estimate.high < C.minReachableBudget(e.teamValue);
-      lines =
-        '<div class="opp-meta">' + teamLine + '</div>' +
-        '<div class="opp-meta" id="oppbudget-' + o.id + '">' + budgetText + '</div>' +
-        '<div class="opp-meta">' + (e.freeSlots === 0
-          ? 'Bietkraft: 0 (Kader voll)'
-          : 'Bietkraft: ' + (o.isMe ? '' : '≈ ') + fmtMoney(Math.max(0, room.headroom)) + ' bis zur 33%-Grenze') + '</div>' +
-        (below ? '<div class="opp-meta" style="color:var(--sell)">Unplausibel tief — vermutlich fehlen Daten</div>' : '');
-    } else if (state.estimatesLoading){
-      lines = '<div class="opp-meta" id="oppbudget-' + o.id + '">Kontostand wird berechnet …</div>';
-    }
-
-    return (
-      '<div class="opp-card' + (isOpen ? ' open' : '') + '">' +
-        '<button class="opp-head" id="opphead-' + o.id + '">' +
-          (o.img ? '<img class="opp-avatar" src="' + o.img + '" alt="">' : '<div class="opp-avatar"></div>') +
-          '<div class="opp-info">' +
-            '<div class="opp-name">' + escapeHtml(o.name) + (o.isMe ? '<span class="you">Du</span>' : '') + '</div>' +
-            '<div class="opp-meta">' + o.points + ' Punkte' + (e && e.wins ? ' · ' + e.wins + '× Spieltagssieger' : '') + '</div>' +
-            lines +
-          '</div>' +
-          '<span class="opp-chev">›</span>' +
-        '</button>' +
-        body +
-      '</div>'
-    );
-  }
-
-  function toggleOpponent(id){
-    state.openOpponent = (state.openOpponent === id) ? null : id;
-    renderGegner();
-  }
-
-  // Kompletter aktueller Kader eines beliebigen Managers (nicht nur die letzte
-  // Aufstellung) inkl. Kaufpreis pro Spieler, wo bekannt — ein einziger Aufruf.
-  function loadOpponentDetail(o){
-    if (!state.currentLeague){
-      state.opponentDetails[o.id] = [];
-      renderGegner();
+    if (!est){
+      html += state.estError
+        ? '<div class="empty">Die Kontostände konnten nicht berechnet werden.<br><button class="link-btn" id="estRetry">Erneut versuchen</button></div>'
+        : '<div class="spinner"></div><div class="progress" id="estProgress">' + escapeHtml(state.estProgress || 'Lade Transfers und Spieltage …') + '</div>';
+      els.body.innerHTML = html;
+      var r = $('estRetry');
+      if (r) r.addEventListener('click', function(){ state.estError = false; render(); });
       return;
     }
-    var id = state.currentLeague.i;
-    fetch(API + "/leagues/" + id + "/managers/" + o.id + "/squad", {headers: headers()})
-      .then(handleResponse)
-      .then(function(sq){
-        var it = sq.it || [];
-        var list = it.map(function(p){
-          return {
-            name: p.pn || "Unbekannt",
-            pos: POS_MAP[p.pos] || "UNK",
-            mv: p.mv || 0,
-            trend: p.mvgl || 0,
-            purchasePrice: p.prc != null ? p.prc : null,
-            avgPoints: p.ap != null ? p.ap : null,
-            status: p.st || 0
-          };
-        });
-        var posOrder = {"TW":1, "ABW":2, "MF":3, "ANG":4};
-        list.sort(function(a,b){ return (posOrder[a.pos]||5) - (posOrder[b.pos]||5); });
-        state.opponentDetails[o.id] = list;
-        if (state.openOpponent === o.id) renderGegner();
-      }).catch(function(){
-        state.opponentDetails[o.id] = {error:true};
-        if (state.openOpponent === o.id) renderGegner();
+
+    var rows = managerRows().filter(function(r){ return r.e; });
+    rows.sort(function(a, b){ return b.power - a.power || b.mid - a.mid; });
+    var max = Math.max.apply(null, rows.map(function(r){ return r.powerHi; }).concat([1]));
+    html += '<div class="ttl"><b>Wer kann mitbieten?</b><span>Bietkraft</span></div>';
+    rows.forEach(function(r){
+      var e = r.e, open = state.openManager === r.m.id;
+      var konto = r.m.isMe ? short(r.mid) + ' (echt)' : short(r.lo) + ' bis ' + short(r.hi);
+      var odd = !r.m.isMe && r.hi < C.minReachableBudget(e.teamValue);
+      html += '<button class="rank' + (r.full ? ' dim' : '') + '" data-mgr="' + r.m.id + '">' +
+        '<div class="h"><div class="n"><span>' + escapeHtml(r.m.name) + '</span>' + (r.m.isMe ? '<em class="you">DU</em>' : '') + '</div>' +
+        '<div class="p mono">' + (r.full ? 'Kader voll' : (r.m.isMe ? '' : '≈ ') + short(r.power)) + '</div></div>' +
+        '<div class="bar"><i style="width:' + (r.powerHi / max * 100).toFixed(1) + '%"></i>' +
+          (r.powerHi > r.powerLo ? '<s style="left:' + (r.powerLo / max * 100).toFixed(1) + '%;width:' + ((r.powerHi - r.powerLo) / max * 100).toFixed(1) + '%"></s>' : '') + '</div>' +
+        '<div class="m"><span>Konto ' + konto + '</span><span>' + (e.freeSlots == null ? '' : e.freeSlots + ' frei') + '</span>' +
+          '<span>Kader ' + short(e.teamValue) + '</span><span>' + r.m.points + ' P' + (e.wins ? ' · ' + e.wins + '× Sieg' : '') + '</span></div>' +
+        (odd ? '<div class="m dn">Unplausibel tief, vermutlich fehlen Daten.</div>' : '') +
+        (open ? squadHtml(r.m.id) : '') +
+      '</button>';
+    });
+    els.body.innerHTML = html;
+    Array.prototype.forEach.call(els.body.querySelectorAll('[data-mgr]'), function(b){
+      b.addEventListener('click', function(){
+        var id = b.getAttribute('data-mgr');
+        state.openManager = state.openManager === id ? null : id;
+        if (state.openManager && !state.managerSquads[id]) loadManagerSquad(id);
+        render();
       });
-  }
-
-  // ---------- helpers ----------
-  function handleResponse(res){
-    if (res.status === 401 || res.status === 403){
-      var e = new Error("auth");
-      e.auth = true;
-      throw e;
-    }
-    if (!res.ok){
-      var e2 = new Error("http-" + res.status);
-      throw e2;
-    }
-    return res.json();
-  }
-
-  function showFetchError(container, err, retryFn){
-    if (err && err.auth){
-      container.innerHTML =
-        '<div class="empty-state">Dein Token wurde von Kickbase abgelehnt — vermutlich ist er abgelaufen.<br><br>' +
-        '<button class="link-btn" id="reAuthBtn">Neuen Token eingeben</button></div>';
-      var btn = document.getElementById('reAuthBtn');
-      if (btn) btn.addEventListener('click', function(){
-        try { localStorage.removeItem('kb_token'); } catch(e){}
-        show('setup');
-      });
-      return;
-    }
-    container.innerHTML =
-      '<div class="empty-state">Verbindung zu Kickbase hat nicht geklappt.<br>Prüfe dein Netz und versuch es nochmal.<br><br>' +
-      '<button class="link-btn" id="retryBtn">Erneut versuchen</button></div>';
-    var rb = document.getElementById('retryBtn');
-    if (rb && retryFn) rb.addEventListener('click', retryFn);
-  }
-
-  function escapeHtml(s){
-    return String(s).replace(/[&<>"']/g, function(c){
-      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
     });
   }
 
-  tryStoredToken();
+  function loadManagerSquad(uid){
+    state.managerSquads[uid] = {loading: true};
+    client.get("/leagues/" + state.league.i + "/managers/" + uid + "/squad").then(function(sq){
+      var order = {TW:1, ABW:2, MF:3, ANG:4};
+      var list = ((sq && sq.it) || []).map(function(p){
+        return { name: p.pn || p.n || "Unbekannt", pos: POS_MAP[p.pos] || "–", mv: p.mv || 0, prc: p.prc, ap: p.ap, status: p.st || 0 };
+      });
+      list.sort(function(a, b){ return (order[a.pos] || 5) - (order[b.pos] || 5) || b.mv - a.mv; });
+      state.managerSquads[uid] = {list: list};
+    }).catch(function(){ state.managerSquads[uid] = {error: true}; })
+      .then(function(){ if (state.tab === 'gegner' && state.openManager === uid) render(); });
+  }
+
+  function squadHtml(uid){
+    var s = state.managerSquads[uid];
+    if (!s || s.loading) return '<div class="opp-squad"><div class="spinner" style="margin:14px auto"></div></div>';
+    if (s.error) return '<div class="opp-squad m">Kader konnte nicht geladen werden.</div>';
+    return '<div class="opp-squad">' + s.list.map(function(p){
+      var g = p.prc != null ? p.mv - p.prc : null;
+      return '<div class="opp-row"><span class="pos">' + p.pos + '</span><span class="nm">' + escapeHtml(p.name) + (p.status ? ' <span class="dot"></span>' : '') + '</span>' +
+        '<span class="v mono">' + short(p.mv) + (g != null ? '<small class="' + cls(g) + '">' + delta(g) + '</small>' : '') + '</span></div>';
+    }).join('') + '</div>';
+  }
+
+  // ---------- Sheet: Ligawahl und Menue ----------
+  function openSheet(html){
+    els.sheet.innerHTML = '<div class="grab"></div>' + html;
+    els.sheet.hidden = false; els.sheetBackdrop.hidden = false;
+  }
+  function closeSheet(){ els.sheet.hidden = true; els.sheetBackdrop.hidden = true; }
+  els.sheetBackdrop.addEventListener('click', closeSheet);
+
+  els.leagueBtn.addEventListener('click', function(){
+    var html = '<h3>Liga wählen</h3>' + state.leagues.map(function(l, i){
+      var on = state.league && String(state.league.i) === String(l.i);
+      return '<button class="item' + (on ? ' on' : '') + '" data-league="' + i + '">' +
+        (l.lim ? '<img src="' + img(l.lim) + '" alt="">' : '<div class="ph"></div>') +
+        '<div><b>' + escapeHtml(l.n || 'Liga') + '</b><span>' + (l.un != null ? l.un + ' Manager' : '') + '</span></div></button>';
+    }).join('');
+    openSheet(html);
+    Array.prototype.forEach.call(els.sheet.querySelectorAll('[data-league]'), function(b){
+      b.addEventListener('click', function(){ closeSheet(); openLeague(state.leagues[+b.getAttribute('data-league')]); });
+    });
+  });
+
+  els.menuBtn.addEventListener('click', function(){
+    openSheet('<h3>' + escapeHtml(state.tokenName || 'Konto') + '</h3>' +
+      '<button class="item danger" id="logoutBtn"><div class="ph"></div><div><b>Token ändern</b><span>Abmelden und neuen Token einfügen</span></div></button>');
+    $('logoutBtn').addEventListener('click', logout);
+  });
+
+  start();
 })();
 
 </script>
-
 </body>
 </html>

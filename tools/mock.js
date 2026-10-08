@@ -20,8 +20,8 @@
 
   var players = [], pid = 1000;
   for (var k = 0; k < 160; k++){
-    var pos = k < 18 ? 1 : (k < 70 ? 2 : (k < 125 ? 3 : 4));
-    var mv = round(500000 + Math.pow(rnd(), 2.2) * 24000000, 1000);
+    var pos = [1,2,2,2,2,3,3,3,3,4,4,4][k % 12];
+    var mv = round(300000 + Math.pow(rnd(), 2.6) * 14000000, 1000);
     var form = rnd();
     var pts = {};
     for (var d = 1; d <= 6; d++) pts[d] = Math.max(0, Math.round((15 + form * 75) * (0.2 + rnd() * 1.6) + (rnd() < 0.04 ? 180 : 0)));
@@ -65,9 +65,9 @@
   function wins(uid){ var w = 0; for (var d = 1; d <= 6; d++){ var best = managers.reduce(function(b, m){ return mdp(m.i, d) > mdp(b.i, d) ? m : b; }, managers[0]); if (best.i === uid) w++; } return w; }
   function mdDate(d){ return new Date(Date.parse(created) + (3 + d * 7) * DAY).toISOString(); }
   function sqItem(p, own){
-    var o = {pi: p.i, i: p.i, pn: p.n, n: p.n, pos: p.pos, tid: p.tid, mv: p.mv, mvgl: p.mvgl, ap: p.ap, st: p.st, prc: p.prc};
-    if (own) o.pim = "";
-    return o;
+    // Eigener Kader: mvgl = Gewinn seit Kauf, tfhmvt = Aenderung 24h; fremder Kader: prc = Kaufpreis
+    if (own) return {i: p.i, n: p.n, pos: p.pos, tid: p.tid, mv: p.mv, mvgl: p.mv - p.prc, tfhmvt: p.mvgl, ap: p.ap, st: p.st, ofc: p.i.slice(-1) === "3" ? 1 : 0};
+    return {pi: p.i, pn: p.n, pos: p.pos, tid: p.tid, mv: p.mv, ap: p.ap, st: p.st, prc: p.prc};
   }
 
   var routes = [

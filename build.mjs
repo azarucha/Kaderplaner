@@ -12,17 +12,18 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8').replace(/\r\n/g,
 
 const css = read('src/styles.css');
 const js = ['src/calc.js', 'src/data.js', 'src/app.js'].map(read).join('\n');
-const html = read('src/index.html')
+const page = (boot, script) => read('src/index.html')
   .replace('/*__CSS__*/', () => css)
-  .replace('/*__JS__*/', () => js);
+  .replace('/*__BOOT__*/', () => boot)
+  .replace('/*__JS__*/', () => script);
 
+// Scriptable: der Wrapper ersetzt /*__BOOT__*/ zur Laufzeit (Token aus der Keychain).
 const wrapper = read('scriptable/wrapper.js');
-const scriptable = wrapper.replace('/*__HTML__*/', () => JSON.stringify(html));
+const scriptable = wrapper.replace('/*__HTML__*/', () => JSON.stringify(page('/*__BOOT__*/', js)));
 
-// Demo-Version mit simuliertem Backend (tools/mock.js) fuer Vorschau und Screenshots
-const demo = read('src/index.html')
-  .replace('/*__CSS__*/', () => css)
-  .replace('/*__JS__*/', () => read('tools/mock.js') + '\n' + js);
+// Web-Version und Demo mit simuliertem Backend (tools/mock.js) fuer Vorschau und Screenshots
+const html = page('', js);
+const demo = page('', read('tools/mock.js') + '\n' + js);
 
 fs.mkdirSync(path.join(root, 'dist'), { recursive: true });
 fs.writeFileSync(path.join(root, 'dist/index.html'), html);
