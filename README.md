@@ -1,220 +1,217 @@
-# Kaderplaner für Kickbase
+# Kaderplaner for Kickbase
 
-Web-App und iPhone-App (über [Scriptable](https://scriptable.app)) für den
-Fußball-Manager Kickbase. Sie zeigt, was die Kickbase-App selbst nicht zeigt: wie
-viel Geld die anderen Manager deiner Liga haben und wer bei einem Spieler überhaupt
-mitbieten kann.
+**English** · [Deutsch](README.de.md)
 
-**[Web-App öffnen](https://azarucha.github.io/Kaderplaner/)** ·
-**[Demo ohne Konto](https://azarucha.github.io/Kaderplaner/demo.html)** ·
-[Scriptable-Datei](dist/Kaderplaner.js)
+A web app and iPhone app (via [Scriptable](https://scriptable.app)) for the fantasy
+football game Kickbase. It shows what the Kickbase app keeps to itself: how much money
+the other managers in your league have, and who can actually afford to bid on a player.
 
-> Inoffizielles Hobbyprojekt, nicht mit Kickbase verbunden. Es nutzt die nicht
-> dokumentierte Web-Schnittstelle nur lesend und kann jederzeit aufhören zu
-> funktionieren, wenn Kickbase daran etwas ändert.
+**[Open the web app](https://azarucha.github.io/Kaderplaner/)** ·
+**[Demo without an account](https://azarucha.github.io/Kaderplaner/demo.html)** ·
+[Scriptable file](dist/Kaderplaner.js)
+
+The app itself is in German. It works for Bundesliga and 2. Bundesliga leagues.
+
+> Unofficial hobby project, not affiliated with Kickbase. It only reads from the
+> undocumented web API, so it can break any day if Kickbase changes something.
 
 <p align="center">
-  <img src="docs/screenshots/kader.jpg" width="260" alt="Aufstellung mit erwarteten Punkten, Zeitraum-Schalter und Kauftipp">
-  <img src="docs/screenshots/markt.jpg" width="260" alt="Transfermarkt mit Kaufempfehlung, Gegnern der nächsten Spiele und Gewinn für die Elf">
-  <img src="docs/screenshots/gegner.jpg" width="260" alt="Bietkraft-Ranking der Gegner">
+  <img src="docs/screenshots/kader.jpg" width="260" alt="Lineup with expected points, time range switch and a buy tip">
+  <img src="docs/screenshots/markt.jpg" width="260" alt="Transfer market with buy recommendation, upcoming opponents and points gained for your eleven">
+  <img src="docs/screenshots/gegner.jpg" width="260" alt="Bidding power ranking of the other managers">
 </p>
-<p align="center"><sub>Screenshots aus dem Demo-Modus mit erfundenen Daten.</sub></p>
+<p align="center"><sub>Screenshots from demo mode with made-up data.</sub></p>
 
-## Was die App kann
+## What it does
 
-- **Aufstellung planen:** Kickbase-Aufstellung übernehmen, Formation wählen (3-4-3 bis
-  5-4-1), Spieler per Tipp einwechseln oder die beste Elf nach erwarteten Punkten füllen
-  lassen. Wird ein Spieler verkauft, rückt Ersatz nach; fehlt jemand, zeigt die App die
-  besten passenden Marktspieler.
-- **Ins Plus kommen:** Steht das Konto nach Plan im Minus, schlägt die App vor, wen
-  du verkaufen solltest. Sie prüft alle Kombinationen und wählt die, die genug Geld
-  bringt und die wenigsten erwarteten Punkte der besten Elf kostet. Erwartete Punkte
-  = Qualität (Punkteschnitt und Form der letzten Einsätze) × Gegnerfaktor ×
-  Einsatzchance (letzte 5 Spieltage und Saison) × Verfügbarkeit; leere Plätze kosten
-  −100. Bei Gleichstand werden schwankende Spieler und fallende Marktwerte zuerst
-  verkauft.
-- **Kaufen lohnt sich:** Für jeden Marktspieler rechnet die App, wie viele erwartete
-  Punkte deine beste Elf pro Spieltag dazugewinnt. Reicht das Geld nicht, sagt sie
-  gleich, wen du dafür verkaufen solltest, und empfiehlt nur, was unterm Strich Punkte
-  bringt. Ein Tipp merkt Gebot und Verkäufe vor und stellt die Elf neu auf.
-- **Gegner der nächsten Spiele:** umschaltbar zwischen nächstem Spiel und den nächsten
-  drei (gewichtet 50/30/20). Der Faktor kommt aus der Teamstärke (Ergebnisse dieser und
-  der letzten Saison) und daraus, wie viele Kickbase-Punkte ein Gegner Spielern auf
-  derselben Position zulässt. In jeder Zeile steht der Gegner, „leicht“ oder „schwer“
-  und ob ein Spieler konstant oder schwankend punktet.
-- **Kader planen:** Spieler zum Verkauf markieren, Marktspieler mit eigenem Gebot
-  vormerken. Kontostand, Spielraum bis zur 33%-Grenze, Kader- und Vereinslimit
-  rechnen sofort mit.
-- **Transfermarkt:** Restlaufzeit, Anzahl der Gebote, Hinweis wenn ein Spieler erst
-  nach dem nächsten Anpfiff zu dir käme, Aufschlag bei Manager-Angeboten.
-- **Gegner:** geschätzter Kontostand jedes Managers als Spanne, daraus die
-  **Bietkraft** (Kontostand plus Spielraum bis zur 33%-Grenze) und freie
-  Kaderplätze. Wer keinen Platz frei hat, kann nicht mitbieten.
-- **Homescreen-Widget:** Kontostand, Spielraum, nächster Anpfiff und die
-  Marktspieler, deren Angebot als Nächstes ausläuft.
-- Hell- und Dunkelmodus, mehrere Ligen, der Token liegt in der iOS-Keychain.
+- **Plan your lineup.** It picks up your current Kickbase lineup, lets you choose a
+  formation from 3-4-3 to 5-4-1, and you can swap players in with a tap or let it fill
+  the best eleven by expected points. Sell someone and the next best player moves up.
+  If a spot is empty, it lists the best fitting players on the market.
+- **Get out of the red.** If your planned balance ends up negative, the app tells you
+  who to sell. It checks every combination and picks the one that raises enough money
+  while costing your best eleven the fewest expected points. Expected points are
+  quality (points average and recent form) × opponent factor × chance of playing (last
+  5 matchdays and the season) × availability. An empty spot counts as −100. On a tie it
+  sells the streaky players and falling market values first.
+- **See if a buy is worth it.** For every player on the market the app works out how
+  many expected points per matchday your best eleven would gain. If you can't afford
+  him, it says right away who you'd have to sell, and it only recommends deals that
+  add points overall. One tap notes the bid and the sales and rearranges your eleven.
+- **Upcoming opponents.** Switch between the next match and the next three (weighted
+  50/30/20). The factor comes from team strength (results this season and last) and
+  from how many Kickbase points an opponent gives up to players in the same position.
+  Each row shows the opponent, whether it's an easy or hard game, and whether the
+  player scores consistently or swings a lot.
+- **Plan your squad.** Mark players for sale and note market players with your own
+  bid. Balance, room left until the 33% limit, squad size and the per-club limit
+  update immediately.
+- **Transfer market.** Time left, number of bids, a note when a player would only join
+  you after the next kickoff, and the markup on offers from other managers.
+- **Rivals.** An estimated balance for every manager, shown as a range. From that comes
+  their **bidding power** (balance plus room until the 33% limit) and how many squad
+  spots they have free. Someone with a full squad can't bid at all.
+- **Home screen widget.** Balance, room to spend, next kickoff and the market players
+  whose listing ends next.
+- Light and dark mode, multiple leagues, and the token is stored in the iOS keychain.
 
-## Die eigentliche Aufgabe: Kontostände rekonstruieren
+## The real work: rebuilding everyone's balance
 
-Kickbase zeigt dir nur deinen eigenen Kontostand. Für jede Gebotsentscheidung ist
-aber entscheidend, was die anderen bieten *können*. Die App rechnet die Kontostände
-deshalb aus öffentlich abrufbaren Daten nach:
+Kickbase only shows you your own balance. But for every bid, what matters is what the
+others *can* pay. So the app recalculates their balances from data anyone in the
+league can fetch:
 
 ```
-Kontostand = Startbudget
-           − Käufe + Verkäufe           (komplette Transferhistorie pro Manager)
-           + MVP-Auto-Verkäufe
-           + Punkteprämie               (1.000 € je Saisonpunkt in der 2. Liga)
-           + Erfolgsprämien             (Spieltagssiege, Punkteschwellen, starke
-                                         Spieler, Transfers, Gewinne pro Spieler)
-           + tägliche Auflaufprämie     (Staffel bis 50k bzw. 100k pro Tag)
+balance = starting budget
+        − purchases + sales           (full transfer history per manager)
+        + MVP auto-sales
+        + points bonus                (€1,000 per season point in the 2. Bundesliga)
+        + achievement bonuses         (matchday wins, point thresholds, strong
+                                       players, transfers, profit per player)
+        + daily login bonus           (scales up to 50k or 100k per day)
 ```
 
-**Prüfstein:** Dieselbe Rechnung wird auf das eigene Konto angewendet, dessen echten
-Stand die API liefert. In einer echten Liga mit rund 960 Mio € Transfervolumen lag
-die Abweichung bei **50.000 €**. Die App zeigt diese Gegenprobe bei jeder Berechnung
-an, damit man sieht, wie belastbar die Gegnerwerte gerade sind.
+**The check:** the same calculation runs on your own account, whose real balance the
+API does return. In a real league with about €960 million in transfer volume it was
+off by **€50,000**. The app shows this cross-check every time it calculates, so you can
+see how far to trust the rival numbers on that day.
 
-Unterwegs gefunden und dokumentiert ([docs/kickbase-api-notes.md](docs/kickbase-api-notes.md)):
+Things I found along the way, written up in
+[docs/kickbase-api-notes.md](docs/kickbase-api-notes.md) (German):
 
-- Der Aktivitäten-Feed reicht nur etwa einen Monat zurück. Wer Transfers nur daraus
-  liest, verliert alles Ältere. Die erste Version der App hat das unbemerkt mit
-  einem Korrekturbetrag von −67 Mio „ausgeglichen“ und Gegner um bis zu 20 Mio
-  falsch geschätzt. Die vollständige Historie gibt es pro Manager über einen
-  anderen Endpunkt.
-- Der Teamwert in der Rangliste ist nur der Wert der Aufstellung, nicht des Kaders.
-- Die Erfolgsprämien sind nirgends pro Gegner abrufbar, lassen sich aber aus
-  Spieltags-, Spieler- und Transferdaten exakt ableiten. Für das eigene Konto stimmt
-  die Ableitung auf den Euro mit den von Kickbase gemeldeten Erfolgen überein.
+- The activity feed only goes back about a month. If you read transfers from it alone,
+  you lose everything older. The first version of the app quietly "fixed" that with a
+  −67 million correction and got rivals wrong by up to 20 million. The full history is
+  available per manager through a different endpoint.
+- The team value in the league ranking is only the value of the lineup, not of the
+  whole squad.
+- Achievement bonuses can't be fetched for other managers, but they can be derived
+  exactly from matchday, player and transfer data. For my own account the derived
+  amount matches what Kickbase reports, down to the euro.
 
-## Hilft der Gegner wirklich bei der Vorhersage?
+## Does the opponent really help the prediction?
 
-Ja, aber weniger, als man denkt. Rückgerechnet an 475 Spielern der 2. Liga (4.644
-Startelf-Einsätze, jeder Spieltag nur mit den Daten davor vorhergesagt, Skript
+Yes, but less than you'd think. I tested it on 475 players from the 2. Bundesliga (4,644
+starts, each matchday predicted only from the data available before it, script
 [`tools/backtest.mjs`](tools/backtest.mjs)):
 
-| Vorhersage | mittlerer Fehler (RMSE) |
+| Prediction | mean error (RMSE) |
 |---|---|
-| Saisonschnitt des Spielers | 63,7 Punkte |
-| Schnitt × Gegnerfaktor | **63,2 Punkte** |
+| player's season average | 63.7 points |
+| average × opponent factor | **63.2 points** |
 
-Der Unterschied ist klein, aber deutlich größer als der Zufall (rund vier
-Standardfehler). Kickbase-Punkte schwanken pro Spiel enorm; selbst mit den tatsächlichen
-Ergebnissen im Nachhinein käme man nur auf 62,3. Zwei Ideen haben die Vorhersage dagegen
-**nicht** verbessert und sind deshalb nicht drin: ein getrimmter Schnitt ohne
-Ausreißerspiele und ein eigener Gegnereffekt pro Spieler. Konstanz zeigt die App an und
-nutzt sie bei Gleichstand, an den Punkten ändert sie nichts.
+The gap is small, but well beyond chance (about four standard errors). Kickbase points
+swing wildly from game to game; even knowing the actual results afterwards only gets
+you to 62.3. Two ideas did **not** improve the prediction, so they're not in the app:
+a trimmed average without outlier games, and a separate opponent effect per player.
+The app shows consistency and uses it to break ties, but it doesn't change the points.
 
-Grenzen: Früh in der Saison und bei Aufsteigern gibt es wenige Spiele, die Werte werden
-dann zum Mittel gezogen. Pokal- und Europapokalspiele zählen nicht.
+Limits: early in the season and for newly promoted teams there are only a few games, so
+the values get pulled toward the average. Cup and European games don't count.
 
 ## Installation
 
-### Als Web-App
+### As a web app
 
-[azarucha.github.io/Kaderplaner](https://azarucha.github.io/Kaderplaner/) ist eine
-statische Web-App (PWA) ohne Server-Anteil: Login mit Kickbase-E-Mail und Passwort,
-das Passwort geht direkt an Kickbase und wird nicht gespeichert. Auf dem iPhone in
-Safari öffnen und über *Teilen → Zum Home-Bildschirm* installieren. Unter
-[`demo.html`](https://azarucha.github.io/Kaderplaner/demo.html) läuft dieselbe App
-mit erfundenen Daten, ganz ohne Kickbase-Konto. Gebaut wird sie aus `dist/web/` bei
-jedem Push auf `main`.
+[azarucha.github.io/Kaderplaner](https://azarucha.github.io/Kaderplaner/) is a static
+web app (PWA) with no server of its own. You log in with your Kickbase email and
+password; the password goes straight to Kickbase and isn't stored. On the iPhone, open
+it in Safari and use *Share → Add to Home Screen*. The same app runs with made-up data
+at [`demo.html`](https://azarucha.github.io/Kaderplaner/demo.html), no Kickbase account
+needed. It's built from `dist/web/` on every push to `main`.
 
-### Als Scriptable-App mit Widget
+### As a Scriptable app with widget
 
-1. [Scriptable](https://apps.apple.com/app/scriptable/id1405459188) aus dem App Store
-   installieren.
-2. [`dist/Kaderplaner.js`](dist/Kaderplaner.js) in den Scriptable-Ordner in iCloud
-   Drive legen (oder in Scriptable ein neues Skript anlegen und den Inhalt einfügen).
-3. Skript starten und mit E-Mail und Passwort anmelden (oder einen Token einfügen).
-   Der Token liegt danach in der iOS-Keychain. Er läuft nach einigen Tagen ab,
-   dann fragt die App erneut.
+1. Install [Scriptable](https://apps.apple.com/app/scriptable/id1405459188) from the
+   App Store.
+2. Put [`dist/Kaderplaner.js`](dist/Kaderplaner.js) into the Scriptable folder in
+   iCloud Drive (or create a new script in Scriptable and paste the contents).
+3. Run the script and log in with email and password (or paste a token). The token is
+   then kept in the iOS keychain. It expires after a few days and the app asks again.
 
-**Widget:** Auf dem Homescreen ein Scriptable-Widget hinzufügen, als Skript
-„Kaderplaner“ wählen. Klein, Mittel und Groß werden unterstützt. Im Feld
-*Parameter* kannst du einen Liganamen oder eine Liga-ID eintragen; ohne Angabe zeigt
-das Widget die zuletzt in der App geöffnete Liga.
+**Widget:** add a Scriptable widget to your home screen and pick "Kaderplaner" as the
+script. Small, medium and large sizes work. In the *Parameter* field you can enter a
+league name or league ID; if you leave it empty, the widget shows the league you last
+opened in the app.
 
-## Aufbau
+## How it's built
 
 ```mermaid
 flowchart LR
-  subgraph Gerät
-    W[Scriptable-Wrapper<br/>Keychain, Widget] --> V[App-Oberfläche<br/>WebView oder Browser]
-    P[Web-App / PWA] --> V
-    V --> D[data.js<br/>API-Aufrufe, Cache]
-    D --> C[calc.js<br/>33%-Regel, Prämien,<br/>Schätzung, Gegnermodell]
+  subgraph Device
+    W[Scriptable wrapper<br/>keychain, widget] --> V[App UI<br/>WebView or browser]
+    P[Web app / PWA] --> V
+    V --> D[data.js<br/>API calls, cache]
+    D --> C[calc.js<br/>33% rule, bonuses,<br/>estimate, opponent model]
   end
-  D -->|nur GET| K[(Kickbase-API)]
-  D -->|Ergebnisse| O[(OpenLigaDB)]
-  W -->|Widget, nur GET| K
+  D -->|GET only| K[(Kickbase API)]
+  D -->|results| O[(OpenLigaDB)]
+  W -->|widget, GET only| K
 ```
 
-| Datei | Inhalt |
+| File | Contents |
 |---|---|
-| `src/calc.js` | Reine Rechenfunktionen ohne DOM und Netzwerk, getestet in `test/` |
-| `src/data.js` | Lädt Transfers, Spieltage, Spielerpunkte und Prämien, rechnet die Schätzung |
-| `src/app.js`, `src/index.html`, `src/styles.css` | Oberfläche |
-| `scriptable/wrapper.js` | Scriptable-Hülle: Keychain, Widget, Brücke zur WebView |
-| `web/` | Manifest, Service Worker und Icons der Web-App |
-| `build.mjs` | Bündelt alles zu `dist/Kaderplaner.js` (Scriptable) und `dist/web/` (PWA) |
-| `tools/mock.js` | Simuliertes Kickbase-Backend mit erfundenen Daten für Demo und Tests |
-| `tools/widget-harness.mjs` | Führt das Widget in Node mit nachgebildeten Scriptable-APIs aus |
-| `tools/backtest.mjs` | Rückrechnung des Gegnermodells auf einem lokalen Datenexport (`tools/collect.html`) |
+| `src/calc.js` | Pure calculation functions without DOM or network, tested in `test/` |
+| `src/data.js` | Loads transfers, matchdays, player points and bonuses, runs the estimate |
+| `src/app.js`, `src/index.html`, `src/styles.css` | User interface |
+| `scriptable/wrapper.js` | Scriptable shell: keychain, widget, bridge to the WebView |
+| `web/` | Manifest, service worker and icons for the web app |
+| `build.mjs` | Bundles everything into `dist/Kaderplaner.js` (Scriptable) and `dist/web/` (PWA) |
+| `tools/mock.js` | Simulated Kickbase backend with made-up data for the demo and tests |
+| `tools/widget-harness.mjs` | Runs the widget in Node against stand-ins for the Scriptable APIs |
+| `tools/backtest.mjs` | Backtest of the opponent model on a local data export (`tools/collect.html`) |
 
-## Entwicklung
+## Development
 
-Voraussetzung ist Node.js 22 oder neuer, weitere Abhängigkeiten gibt es nicht.
+You need Node.js 22 or newer. There are no other dependencies.
 
 ```bash
-npm test          # Rechenlogik gegen anonymisierte Messwerte einer echten Liga
-npm run build     # dist/Kaderplaner.js und die Web-App in dist/web/
-npm run demo      # Web-App auf http://localhost:8787 (Demo unter demo.html)
-npm run widget    # Widget-Aufbau gegen das Demo-Backend ausgeben
-npm run deploy    # bauen und in den iCloud-Scriptable-Ordner kopieren
+npm test          # calculation logic against anonymized data from a real league
+npm run build     # dist/Kaderplaner.js and the web app in dist/web/
+npm run demo      # web app on http://localhost:8787 (demo at demo.html)
+npm run widget    # print the widget layout against the demo backend
+npm run deploy    # build and copy into the iCloud Scriptable folder
 ```
 
-## Entstehung
+## How it came about
 
-Das Projekt ist mit [Claude Code](https://claude.com/claude-code) entstanden: von der
-ersten Version über das Nachvollziehen der Prämienlogik an Live-Daten bis zu Tests,
-Demo-Backend und Widget. Die Schätzformel wurde nicht geraten, sondern Schritt für
-Schritt gegen den echten Kontostand geprüft, bis die Abweichung im Rauschen lag.
+I built this with [Claude Code](https://claude.com/claude-code), from the first version
+through working out the bonus rules against live data to the tests, the demo backend and
+the widget. The balance formula wasn't guessed. It was checked step by step against my
+real balance until the difference was down in the noise.
 
-## Hinweise
+## Notes
 
-- Inoffizielles Projekt, nicht mit Kickbase verbunden. Es nutzt die nicht
-  dokumentierte Web-API, die sich jederzeit ändern kann. Es gibt keinen Support und
-  keine Zusagen für neue Funktionen.
-- Die App **liest nur**. Sie gibt keine Gebote ab, verkauft nichts und ändert keine
-  Aufstellung.
-- Die Gegnerwerte sind Schätzungen. Unsicher bleiben vor allem die Auflaufprämie
-  (loggt jemand täglich ein?) und ältere Mannschaftswert-Erfolge.
+- Unofficial project, not affiliated with Kickbase. It uses the undocumented web API,
+  which can change at any time. There's no support and no promise of new features.
+- The app **only reads**. It never places bids, sells players or changes your lineup.
+- Rival values are estimates. The two shakiest parts are the daily login bonus (does
+  someone log in every day?) and older team value achievements.
 
-## Datenschutz
+## Privacy
 
-- Es gibt keinen eigenen Server, kein Tracking und keine Werbung. Die App ist eine
-  statische Seite, die direkt im Browser mit `api.kickbase.com` (und für Ergebnisse
-  mit `api.openligadb.de`) spricht.
-- E-Mail und Passwort gehen beim Anmelden nur an Kickbase und werden nicht
-  gespeichert. Auf dem Gerät bleibt nur der Zugangstoken (im Browser-Speicher bzw.
-  in der iOS-Keychain), bis du dich abmeldest.
-- Die Schrift [Geist](https://github.com/vercel/geist-font) wird mitgeliefert
-  (SIL Open Font License), Schriften oder Skripte von Drittservern werden nicht
-  nachgeladen.
-- Für den Gegnerfaktor holt die App öffentliche Spielergebnisse von
-  [OpenLigaDB](https://www.openligadb.de) (`api.openligadb.de`, ohne Login und Cookies).
-  Dabei sieht OpenLigaDB wie jeder Server deine IP-Adresse; Kickbase-Daten oder dein
-  Token gehen nicht dorthin. Ist OpenLigaDB nicht erreichbar, rechnet die App mit den
-  Ergebnissen aus den Kickbase-Daten.
-- Die Web-Version liegt auf GitHub Pages; dort gilt das
-  [GitHub Privacy Statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement).
+- There's no server of my own, no tracking and no ads. The app is a static page that
+  talks to `api.kickbase.com` straight from your browser (and to `api.openligadb.de`
+  for match results).
+- When you log in, your email and password go only to Kickbase and aren't stored. The
+  only thing kept on your device is the access token (in browser storage or the iOS
+  keychain) until you log out.
+- The [Geist](https://github.com/vercel/geist-font) font ships with the app (SIL Open
+  Font License). No fonts or scripts are loaded from third-party servers.
+- For the opponent factor the app fetches public match results from
+  [OpenLigaDB](https://www.openligadb.de) (`api.openligadb.de`, no login, no cookies).
+  Like any server, OpenLigaDB sees your IP address; your Kickbase data and token are
+  never sent there. If OpenLigaDB is down, the app falls back to results from the
+  Kickbase data.
+- The web version is hosted on GitHub Pages, where the
+  [GitHub Privacy Statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement)
+  applies.
 
-## Unterstützen
+## Support
 
-Der Kaderplaner ist kostenlos und bleibt es. Wenn er dir beim Bieten hilft, freue ich
-mich über einen Kaffee auf [Ko-fi](https://ko-fi.com/azarucha).
+Kaderplaner is free and will stay that way. If it helps you win a bid, I'd be happy
+about a coffee on [Ko-fi](https://ko-fi.com/azarucha).
 
-## Lizenz
+## License
 
 [MIT](LICENSE)
