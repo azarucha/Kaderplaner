@@ -955,22 +955,21 @@
 
   function bidHintHtml(p){
     var mk = state.markups;
-    if (!state.estimates) return '<div class="bidhint">Wer mitbieten kann, steht hier, sobald die Kontostände berechnet sind.</div>';
-    if (!mk) return state.markupsLoading ? '<div class="bidhint">Lade die Aufschläge der Liga …</div>' : '';
+    if (!mk) return '';
     var lines = [];
-    if (mk.all) lines.push('Die Liga zahlt im Mittel <b>' + pctText(mk.all.median) + '</b> auf den Marktwert (' + mk.all.n + ' Käufe, 45 Tage).');
+    if (mk.all) lines.push('Liga zahlt im Mittel <b>' + pctText(mk.all.median) + '</b>');
     var rivals = managerRows().filter(function(r){ return r.e && !r.m.isMe && !r.full && r.powerHi >= p.mv; })
       .sort(function(a, b){ return b.power - a.power; });
-    if (!rivals.length) lines.push('Keiner der anderen kann gerade mitbieten.');
-    else lines.push('Mitbieten können ' + rivals.slice(0, 3).map(function(r){
+    if (!rivals.length) lines.push('Niemand kann mitbieten');
+    else lines.push('Mitbieten: ' + rivals.slice(0, 3).map(function(r){
       var own = mk.byUser[r.m.id];
-      return escapeHtml(r.m.name) + (own && own.n >= 3 ? ' (zahlt ' + pctText(own.median) + ')' : '');
-    }).join(', ') + (rivals.length > 3 ? ' und ' + (rivals.length - 3) + ' weitere' : '') + '.');
+      return escapeHtml(r.m.name) + (own && own.n >= 3 ? ' ' + pctText(own.median) : '');
+    }).join(', ') + (rivals.length > 3 ? ' +' + (rivals.length - 3) : ''));
     var sug = C.suggestBid(p.mv, mk.all);
     var btn = sug && sug !== state.bids[p.id]
       ? '<button type="button" class="text-btn" data-suggest="' + p.id + '" data-amount="' + sug + '">Übernehmen</button>' : '';
-    if (sug) lines.push('Vorschlag <b>' + short(sug) + '</b>: mehr als in drei von vier Ligakäufen.');
-    return '<div class="bidhint">' + lines.map(function(x){ return '<p>' + x + '</p>'; }).join('') + btn + '</div>';
+    if (sug) lines.push('Vorschlag <b>' + short(sug) + '</b>' + btn);
+    return '<div class="bidhint">' + lines.map(function(x){ return '<p>' + x + '</p>'; }).join('') + '</div>';
   }
 
   function marketPanel(compact){
@@ -1083,7 +1082,7 @@
         (open ? managerSquadHtml(r.m.id) : '') +
       '</button>';
     });
-    if (!compact && inactive) html += '<div class="inact-row"><span>' + inactive + (inactive > 1 ? ' Manager wirken' : ' Manager wirkt') + ' inaktiv (' + INACTIVE_DAYS + ' Tage ohne Transfer, letzter Spieltag ohne Punkte)</span>' +
+    if (!compact && inactive) html += '<div class="inact-row"><span>' + inactive + ' inaktiv</span>' +
       '<button type="button" class="text-btn" id="inactBtn">' + (state.hideInactive ? 'Zeigen' : 'Ausblenden') + '</button></div>';
     return html + '</section>';
   }
@@ -1125,7 +1124,7 @@
   function drawHistory(){
     var box = $('histBody');
     if (!box || !state.estimates) return;
-    var width = Math.max(260, box.clientWidth), list = visibleManagers(), est = state.estimates, read = $('histRead');
+    var cs = getComputedStyle(box), width = Math.max(260, box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)), list = visibleManagers(), est = state.estimates, read = $('histRead');
     if (read) read.innerHTML = '';
     if (histView === 'konto'){
       if (!histFocus || !list.some(function(m){ return m.id === histFocus; })){
@@ -1140,8 +1139,7 @@
       box.innerHTML = '<div class="hist-chart">' + KBCharts.line(main, opts) + '</div>' +
         '<div class="hist-chips">' + list.map(function(m){
           return '<button type="button" class="chip' + (m === focus ? ' on' : '') + '" data-hfocus="' + escapeHtml(m.id) + '">' + escapeHtml(managerLabel(m)) + '</button>';
-        }).join('') + '</div>' +
-        '<p class="hist-note">Transfers und Punkteprämien mit Datum, Erfolge und Auflaufprämie gleichmäßig verteilt. Grau: die anderen Manager.</p>';
+        }).join('') + '</div>';
       KBCharts.bindLine(box.querySelector('svg'), main, opts, read, function(x){
         return escapeHtml(managerLabel(focus)) + ' · ' + dateLabel(x.t) + ' · <b>' + short(x.mv) + '</b>';
       });
@@ -1162,11 +1160,11 @@
           '<div class="pl-bar">' + (hasNeg ? '<em style="left:50%"></em>' : '') +
             '<i class="' + (r.real < 0 ? 'neg' : 'pos') + '" style="left:' + left.toFixed(1) + '%;width:' + w.toFixed(1) + '%"></i></div>' +
           '<div class="pl-meta num">' + r.sales + ' Verkäufe · im Kader <span class="' + signCls(r.open) + '">' + delta(r.open) + '</span></div></div>';
-      }).join('') + '<p class="hist-note">Gewinn = Verkaufspreis minus Kaufpreis aller verkauften Spieler seit Ligastart. „Im Kader“: Marktwert minus Kaufpreis der Spieler, die noch da sind.</p>';
+      }).join('');
     } else {
       var days = est.days;
-      if (!days.length){ box.innerHTML = '<p class="hist-note">Noch kein Spieltag abgeschlossen.</p>'; return; }
-      var n = Math.max(1, Math.min(days.length, Math.floor((width - 96 - 52) / 40))), shown = days.slice(-n);
+      if (!days.length){ box.innerHTML = '<p class="hist-note">Noch kein Spieltag gespielt.</p>'; return; }
+      var n = Math.max(1, Math.min(days.length, Math.floor((width - 104 - 48) / 38))), shown = days.slice(-n);
       var tot = function(m){ return days.reduce(function(s, d){ return s + (est.byUser[m.id].matchdayPoints[d] || 0); }, 0); };
       var sorted = list.slice().sort(function(a, b){ return tot(b) - tot(a); });
       var colMax = {}, colMin = {};
@@ -1174,7 +1172,7 @@
         var v = sorted.map(function(m){ return est.byUser[m.id].matchdayPoints[d] || 0; });
         colMax[d] = Math.max.apply(null, v); colMin[d] = Math.min.apply(null, v);
       });
-      var html = '<div class="hm-grid" style="grid-template-columns:minmax(0,1fr) repeat(' + n + ', 36px) 48px"><span></span>' +
+      var html = '<div class="hm-grid" style="grid-template-columns:minmax(0,1fr) repeat(' + n + ', 34px) 44px"><span></span>' +
         shown.map(function(d){ return '<span class="hm-day num">' + d + '.</span>'; }).join('') + '<span class="hm-day num">Σ</span>';
       sorted.forEach(function(m){
         html += '<span class="hm-name' + (m.isMe ? ' me' : '') + '">' + escapeHtml(managerLabel(m)) + '</span>';
@@ -1186,8 +1184,7 @@
         });
         html += '<span class="hm-sum num">' + tot(m) + '</span>';
       });
-      box.innerHTML = html + '</div><p class="hist-note">Punkte je Spieltag, dunkler = mehr. Schwarz hinterlegt: Spieltagssieg.' +
-        (n < days.length ? ' Zu sehen sind die letzten ' + n + ' von ' + days.length + ' Spieltagen, Σ zählt alle.' : '') + '</p>';
+      box.innerHTML = html + '</div>' + (n < days.length ? '<p class="hist-note">Letzte ' + n + ' von ' + days.length + ' Spieltagen</p>' : '');
     }
   }
 
