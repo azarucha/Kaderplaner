@@ -201,6 +201,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
 .advice-head{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
 .advice-head b{ font-size:15px; font-weight:600; }
 .advice-head span{ font-size:13px; color:var(--neg); }
+.advice-head span.mut{ color:var(--mut); }
 .advice-opt{ display:flex; align-items:center; gap:12px; padding:12px 0; border-top:1px solid var(--line2); margin-top:10px; }
 .advice-opt + .advice-opt{ margin-top:0; }
 .advice-title{ font-size:12px; font-weight:600; color:var(--mut); text-transform:uppercase; letter-spacing:.04em; }
@@ -340,6 +341,14 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
 .horizon-note{ padding:8px 20px 0; font-size:12.5px; color:var(--mut); }
 @media (min-width: 1000px){
   .horizon-note{ padding-left:0; padding-right:0; }
+}
+
+/* Kauftipp im Kader */
+.buy-hint{ display:flex; align-items:center; justify-content:space-between; gap:10px; width:calc(100% - 40px); margin:12px 20px 0; padding:11px 14px; border:1px solid var(--line); border-radius:12px; text-align:left; font-size:13.5px; }
+.buy-hint b{ font-weight:600; }
+.buy-hint > span:last-child{ color:var(--faint); font-size:18px; }
+@media (min-width: 1000px){
+  .buy-hint{ width:100%; margin-left:0; margin-right:0; }
 }
 
 </style>
@@ -999,8 +1008,64 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     return out;
   }
 
+  // Kaufempfehlung auf derselben Grundlage wie die Verkaeufe: Wie viele erwartete
+  // Punkte gewinnt die beste Elf pro Spieltag mit diesem Marktspieler dazu? Reicht
+  // das Geld nicht (oder ist der Kader voll), rechnet recommendSales mit, wer dafuer
+  // gehen soll; empfohlen wird nur, was unterm Strich Punkte bringt.
+  //   sellable: eigene Spieler nach Plan, fixed: vorgemerkte Kaeufe,
+  //   market: [{id, pos, price, tid, ap, form, fixture, status, trend, cons}]
+  //   opts: after (Konto nach Plan), teamValue (Wert nach Plan), squadLimit,
+  //         clubLimit, clubCounts {tid: n}, finance (wie viele Kandidaten mit Verkauf)
+  function recommendBuys(sellable, fixed, market, opts){
+    opts = opts || {};
+    sellable = sellable || []; fixed = fixed || [];
+    var squad = sellable.concat(fixed), after = opts.after || 0;
+    var have = {};
+    squad.forEach(function(p){ have[p.id] = true; });
+    var base = bestEleven(squad).points;
+    // Steht das Konto schon im Minus, ist der Vergleich die Elf nach den noetigen Verkaeufen
+    var ref = base;
+    if (after < 0){
+      var fix = recommendSales(sellable, -after, {fixed: fixed, maxN: 14});
+      ref = fix.points ? fix.points.points : -Infinity;
+    }
+    var full = opts.squadLimit && squad.length >= opts.squadLimit;
+    var gains = {}, list = [];
+    (market || []).forEach(function(m){
+      if (have[m.id]) return;
+      if (opts.clubLimit && m.tid != null && ((opts.clubCounts || {})[m.tid] || 0) >= opts.clubLimit) return;
+      var gain = bestEleven(squad.concat([m])).points - base;
+      gains[m.id] = gain;
+      if (gain >= 0.5) list.push({m: m, gain: gain});
+    });
+    list.sort(function(a, b){ return b.gain - a.gain; });
+    var out = [];
+    list.slice(0, opts.finance || 5).forEach(function(c){
+      var m = c.m, price = m.price || 0;
+      var need = Math.max(price - after, full ? 1 : 0), sells = [], money = 0, soldValue = 0, points = base + c.gain;
+      if (need > 0){
+        var r = recommendSales(sellable, need, {fixed: fixed.concat([m]), maxN: 14});
+        if (!r.points) return;
+        sells = r.points.ids; money = r.points.money; points = r.points.points;
+        sellable.forEach(function(p){ if (sells.indexOf(p.id) >= 0) soldValue += p.mv || 0; });
+      }
+      var net = points - ref;
+      if (net < 0.5) return;
+      // 33%-Regel im Moment des Gebots: Verkaeufe sind gebucht, das Gebot zaehlt als offen
+      var room = bidRoom((opts.teamValue || 0) - soldValue, after + money, price);
+      out.push({id: m.id, gain: c.gain, net: net, price: price, perMio: net / Math.max(0.1, price / 1e6),
+        sells: sells, money: money, after: after + money - price, ok: room.headroom >= 0,
+        trend: m.trend || 0, cons: m.cons != null ? m.cons : 0.6});
+    });
+    out.sort(function(a, b){
+      return Math.round(b.net) - Math.round(a.net) || b.perMio - a.perMio || b.trend - a.trend || b.cons - a.cons;
+    });
+    return {base: base, ref: ref, gains: gains, list: out};
+  }
+
   return {
     FORMATIONS: FORMATIONS,
+    recommendBuys: recommendBuys,
     availability: availability,
     expectedPoints: expectedPoints,
     formFromPerformance: formFromPerformance,
@@ -1603,6 +1668,12 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     };
   }
   var state = initialState();
+  // Nur in der Demo (Screenshots): ?tab=markt oeffnet direkt einen Tab, ?theme=dark erzwingt das Farbschema
+  if (demo) try {
+    var qs = new URLSearchParams(location.search);
+    if (qs.get('tab')) state.tab = qs.get('tab');
+    if (qs.get('theme')) document.documentElement.setAttribute('data-theme', qs.get('theme'));
+  } catch(e){}
   var client = KBData.createClient(function(){ return state.token; });
 
   function show(screen){
@@ -1775,7 +1846,8 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
           id: String(p.i), name: (p.fn ? p.fn.charAt(0) + ". " : "") + (p.n || "Unbekannt"),
           pos: POS_MAP[p.pos] || "–", mv: p.mv || 0, price: p.prc != null ? p.prc : (p.mv || 0),
           expires: p.exs != null ? p.exs : null, loadedAt: Date.now(), status: p.st || 0,
-          bids: p.ofc || 0, by: p.u ? (p.u.n || "Manager") : null, tid: p.tid, ap: p.ap
+          bids: p.ofc || 0, by: p.u ? (p.u.n || "Manager") : null, tid: p.tid, ap: p.ap,
+          mvt: p.mvt === 1 ? 1 : (p.mvt === 2 ? -1 : 0)
         };
       });
 
@@ -2284,6 +2356,65 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     saveLineup();
   }
 
+  // ---------- Empfehlung: kaufen ----------
+  var buyCache = {key: null, value: null};
+  function buyAdvice(){
+    if (!state.market.length || !state.league) return null;
+    var p = plan(), ov = state.overview || {};
+    var free = state.market.filter(function(m){ return state.bids[m.id] == null; });
+    var key = state.league.i + '|' + p.after + '|' + p.kept.map(function(x){ return x.id; }).join(',') + '|' + p.bought.map(function(x){ return x.id; }).join(',') + '|' +
+      free.map(function(m){ return m.id + ':' + m.price; }).join(',') + '|' + !!state.forms + '|' + horizon + '|' + (state.opp ? state.opp.at : 0);
+    if (buyCache.key !== key){
+      var clubs = {};
+      p.kept.concat(p.bought).forEach(function(x){ if (x.tid != null) clubs[x.tid] = (clubs[x.tid] || 0) + 1; });
+      var keptValue = p.kept.reduce(function(s, x){ return s + x.mv; }, 0);
+      var cand = free.map(function(m){ var e = calcEntry(m); e.price = m.price; e.tid = m.tid; e.trend = m.mvt || 0; return e; });
+      buyCache = {key: key, value: C.recommendBuys(p.kept.map(calcEntry), p.bought.map(calcEntry), cand, {
+        after: p.after, teamValue: keptValue, squadLimit: ov.mppu, clubLimit: ov.mpst, clubCounts: clubs
+      })};
+    }
+    return buyCache.value;
+  }
+  function marketById(id){ return state.market.filter(function(m){ return m.id === id; })[0] || null; }
+
+  function buyHtml(){
+    var a = buyAdvice();
+    if (!a) return '';
+    var html = '<div class="advice"><div class="advice-head"><b>Kaufen lohnt sich</b><span class="num mut">' + (horizon === 1 ? 'nächstes Spiel' : 'nächste 3 Spiele') + '</span></div>';
+    if (!a.list.length) return html + '<p class="advice-note">Gerade verbessert kein Marktspieler deine beste Elf genug, auch nicht mit Verkauf.</p></div>';
+    a.list.slice(0, 3).forEach(function(r){
+      var m = marketById(r.id);
+      if (!m) return;
+      var meta = ['<span class="up">+' + Math.round(r.net) + ' P/Spieltag</span>', short(r.price)];
+      var fx = fixtureHtml(m);
+      if (fx) meta.push(fx);
+      if (!r.ok) meta.push('<span class="neg">über der 33%-Grenze</span>');
+      var sells = r.sells.map(function(id){ var x = playerById(id); return x ? escapeHtml(x.name) : ''; }).filter(Boolean);
+      html += '<div class="advice-opt"><div class="main">' +
+        '<div class="advice-title">' + POS_LABEL[m.pos] + (m.by ? ' · Angebot von ' + escapeHtml(m.by) : '') + '</div>' +
+        '<div class="advice-names">' + escapeHtml(m.name) + '</div>' +
+        '<div class="advice-meta num">' + meta.join(' · ') + '</div>' +
+        (sells.length ? '<div class="advice-meta num">dafür verkaufen: ' + sells.join(', ') + ' (+' + short(r.money) + (plan().after < 0 ? ', deckt auch das jetzige Minus' : '') + ')</div>' : '') +
+        '</div><button type="button" class="btn" data-buyadvice="' + r.id + '">Vormerken</button></div>';
+    });
+    return html + '<p class="advice-note">Dieselben erwarteten Punkte wie bei den Verkäufen: Form, Einsatzchance, Ausfälle und Gegner. Gerechnet mit dem Angebotspreis; wie hoch du über dem Marktwert bieten musst, hängt von den Mitbietern ab (Bietkraft im Gegner-Tab).</p></div>';
+  }
+
+  function applyBuy(id){
+    var a = buyAdvice(), r = a && a.list.filter(function(x){ return x.id === id; })[0], m = marketById(id);
+    if (!r || !m) return;
+    state.bids[id] = m.price;
+    r.sells.forEach(function(sid){ state.sell[sid] = true; });
+    // Die Empfehlung rechnet mit der besten Elf, also auch so aufstellen
+    var pool = lineupPool().filter(function(x){ return !state.sell[x.id]; }).map(calcEntry);
+    state.lineup = buildLineup(C.bestEleven(pool).formation || state.lineup.formation, bestIds());
+    state.pick = null;
+    var sold = r.sells.map(function(sid){ var x = playerById(sid); return x ? x.name : ''; }).filter(Boolean);
+    state.lineupNote = m.name + ' vorgemerkt (Gebot ' + short(m.price) + ')' + (sold.length ? ', dafür ' + sold.join(', ') + ' zum Verkauf' : '') +
+      '. Neue Elf: ' + state.lineup.formation + '.';
+    saveLineup();
+  }
+
   function squadPanel(compact){
     var total = state.players.reduce(function(s, p){ return s + p.mv; }, 0);
     var html = '<section class="panel"><div class="panel-head"><h2>Kader</h2><span class="num">' +
@@ -2293,6 +2424,8 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       '<button type="button" data-kview="list" class="' + (kaderView === 'list' ? 'on' : '') + '">Liste</button></div>';
     html += horizonHtml();
     html += adviceHtml();
+    var best = !compact && buyAdvice(), top = best && best.list[0] && marketById(best.list[0].id);
+    if (top) html += '<button type="button" class="buy-hint" data-goto="markt"><span>Kauftipp: <b>' + escapeHtml(top.name) + '</b> · <span class="up">+' + Math.round(best.list[0].net) + ' P/Spieltag</span></span><span aria-hidden="true">›</span></button>';
     if (kaderView === 'pitch' && state.lineup) return html + lineupHtml(compact) + '</section>';
     POS_ORDER.concat(["–"]).forEach(function(pos){
       var list = state.players.filter(function(p){ return p.pos === pos; });
@@ -2324,6 +2457,8 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       if (state.nextKickoff && left != null && Date.now() + left * 1000 > state.nextKickoff) sub.push('nach Anpfiff');
     }
     if (p.bids) sub.push(p.bids + ' Gebot' + (p.bids > 1 ? 'e' : ''));
+    var ba = !marked && buyAdvice(), g = ba && ba.gains[p.id];
+    if (g >= 0.5) sub.push('<span class="up">+' + Math.round(g) + ' P Elf</span>');
     var fxm = fixtureHtml(p);
     if (fxm) sub.push(fxm);
     if (!compact && state.clubNames[p.tid]) sub.push(escapeHtml(state.clubNames[p.tid]));
@@ -2344,6 +2479,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   function marketPanel(compact){
     var html = '<section class="panel"><div class="panel-head"><h2>Markt</h2><span>läuft zuerst ab</span></div>';
     if (!state.market.length) return html + '<div class="empty">Gerade steht niemand auf dem Transfermarkt.</div></section>';
+    html += buyHtml();
     var free = state.market.filter(function(p){ return !p.by; });
     var offers = state.market.filter(function(p){ return p.by; });
     free.sort(function(a, b){ return (a.expires || 0) - (b.expires || 0); });
@@ -2578,6 +2714,12 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
         var picker = document.querySelector('#body .picker');
         if (picker && picker.scrollIntoView) picker.scrollIntoView({block: 'nearest', behavior: 'smooth'});
       });
+    });
+    each('#body [data-buyadvice]', function(b){
+      b.addEventListener('click', function(){ applyBuy(b.getAttribute('data-buyadvice')); render(); });
+    });
+    each('#body [data-goto]', function(b){
+      b.addEventListener('click', function(){ setTab(b.getAttribute('data-goto')); });
     });
     each('#body [data-advice]', function(b){
       b.addEventListener('click', function(){ applyAdvice(b.getAttribute('data-advice')); render(); });

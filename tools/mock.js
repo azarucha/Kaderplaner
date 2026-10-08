@@ -157,7 +157,8 @@
   function b64(o){ return btoa(JSON.stringify(o)).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_"); }
   var demoToken = b64({alg: "none"}) + "." + b64({"kb.uid": ME, "kb.name": "Demo Manager", exp: Math.floor(NOW / 1000) + 86400 * 365}) + ".demo";
   window.__KP_DEMO = true;
-  if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded", function(){
+  // ?shot=1 (README-Screenshots): ohne Demo-Hinweis, die Bildunterschrift sagt es schon
+  if (typeof document !== "undefined" && !/[?&]shot=1/.test(location.search)) document.addEventListener("DOMContentLoaded", function(){
     var a = document.createElement("a");
     a.className = "demo-badge";
     a.href = "index.html";

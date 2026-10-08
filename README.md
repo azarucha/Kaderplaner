@@ -14,17 +14,18 @@ mitbieten kann.
 > funktionieren, wenn Kickbase daran etwas ändert.
 
 <p align="center">
-  <img src="docs/screenshots/kader.jpg" width="260" alt="Kader mit Kontostand, Spielraum und Verkaufsplanung">
-  <img src="docs/screenshots/markt.jpg" width="260" alt="Transfermarkt mit Countdown, Geboten und eigenem Gebot">
+  <img src="docs/screenshots/kader.jpg" width="260" alt="Aufstellung mit erwarteten Punkten, Zeitraum-Schalter und Kauftipp">
+  <img src="docs/screenshots/markt.jpg" width="260" alt="Transfermarkt mit Kaufempfehlung, Gegnern der nächsten Spiele und Gewinn für die Elf">
   <img src="docs/screenshots/gegner.jpg" width="260" alt="Bietkraft-Ranking der Gegner">
 </p>
 <p align="center"><sub>Screenshots aus dem Demo-Modus mit erfundenen Daten.</sub></p>
 
 ## Was die App kann
 
-- **Aufstellung planen:** Formation wählen (3-4-3 bis 5-4-1), Spieler aufs Feld
-  setzen oder die beste Elf nach Punkteschnitt füllen lassen. Wer auf der Bank sitzt,
-  lässt sich mit einem Tipp komplett zum Verkauf vormerken.
+- **Aufstellung planen:** Kickbase-Aufstellung übernehmen, Formation wählen (3-4-3 bis
+  5-4-1), Spieler per Tipp einwechseln oder die beste Elf nach erwarteten Punkten füllen
+  lassen. Wird ein Spieler verkauft, rückt Ersatz nach; fehlt jemand, zeigt die App die
+  besten passenden Marktspieler.
 - **Ins Plus kommen:** Steht das Konto nach Plan im Minus, schlägt die App vor, wen
   du verkaufen solltest. Sie prüft alle Kombinationen und wählt die, die genug Geld
   bringt und die wenigsten erwarteten Punkte der besten Elf kostet. Erwartete Punkte
@@ -32,6 +33,10 @@ mitbieten kann.
   Einsatzchance (letzte 5 Spieltage und Saison) × Verfügbarkeit; leere Plätze kosten
   −100. Bei Gleichstand werden schwankende Spieler und fallende Marktwerte zuerst
   verkauft.
+- **Kaufen lohnt sich:** Für jeden Marktspieler rechnet die App, wie viele erwartete
+  Punkte deine beste Elf pro Spieltag dazugewinnt. Reicht das Geld nicht, sagt sie
+  gleich, wen du dafür verkaufen solltest, und empfiehlt nur, was unterm Strich Punkte
+  bringt. Ein Tipp merkt Gebot und Verkäufe vor und stellt die Elf neu auf.
 - **Gegner der nächsten Spiele:** umschaltbar zwischen nächstem Spiel und den nächsten
   drei (gewichtet 50/30/20). Der Faktor kommt aus der Teamstärke (Ergebnisse dieser und
   der letzten Saison) und daraus, wie viele Kickbase-Punkte ein Gegner Spielern auf

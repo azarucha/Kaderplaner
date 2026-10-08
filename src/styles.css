@@ -177,6 +177,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
 .advice-head{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
 .advice-head b{ font-size:15px; font-weight:600; }
 .advice-head span{ font-size:13px; color:var(--neg); }
+.advice-head span.mut{ color:var(--mut); }
 .advice-opt{ display:flex; align-items:center; gap:12px; padding:12px 0; border-top:1px solid var(--line2); margin-top:10px; }
 .advice-opt + .advice-opt{ margin-top:0; }
 .advice-title{ font-size:12px; font-weight:600; color:var(--mut); text-transform:uppercase; letter-spacing:.04em; }
@@ -316,4 +317,12 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
 .horizon-note{ padding:8px 20px 0; font-size:12.5px; color:var(--mut); }
 @media (min-width: 1000px){
   .horizon-note{ padding-left:0; padding-right:0; }
+}
+
+/* Kauftipp im Kader */
+.buy-hint{ display:flex; align-items:center; justify-content:space-between; gap:10px; width:calc(100% - 40px); margin:12px 20px 0; padding:11px 14px; border:1px solid var(--line); border-radius:12px; text-align:left; font-size:13.5px; }
+.buy-hint b{ font-weight:600; }
+.buy-hint > span:last-child{ color:var(--faint); font-size:18px; }
+@media (min-width: 1000px){
+  .buy-hint{ width:100%; margin-left:0; margin-right:0; }
 }

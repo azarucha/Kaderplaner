@@ -123,6 +123,12 @@
     };
   }
   var state = initialState();
+  // Nur in der Demo (Screenshots): ?tab=markt oeffnet direkt einen Tab, ?theme=dark erzwingt das Farbschema
+  if (demo) try {
+    var qs = new URLSearchParams(location.search);
+    if (qs.get('tab')) state.tab = qs.get('tab');
+    if (qs.get('theme')) document.documentElement.setAttribute('data-theme', qs.get('theme'));
+  } catch(e){}
   var client = KBData.createClient(function(){ return state.token; });
 
   function show(screen){
@@ -295,7 +301,8 @@
           id: String(p.i), name: (p.fn ? p.fn.charAt(0) + ". " : "") + (p.n || "Unbekannt"),
           pos: POS_MAP[p.pos] || "–", mv: p.mv || 0, price: p.prc != null ? p.prc : (p.mv || 0),
           expires: p.exs != null ? p.exs : null, loadedAt: Date.now(), status: p.st || 0,
-          bids: p.ofc || 0, by: p.u ? (p.u.n || "Manager") : null, tid: p.tid, ap: p.ap
+          bids: p.ofc || 0, by: p.u ? (p.u.n || "Manager") : null, tid: p.tid, ap: p.ap,
+          mvt: p.mvt === 1 ? 1 : (p.mvt === 2 ? -1 : 0)
         };
       });
 
@@ -804,6 +811,65 @@
     saveLineup();
   }
 
+  // ---------- Empfehlung: kaufen ----------
+  var buyCache = {key: null, value: null};
+  function buyAdvice(){
+    if (!state.market.length || !state.league) return null;
+    var p = plan(), ov = state.overview || {};
+    var free = state.market.filter(function(m){ return state.bids[m.id] == null; });
+    var key = state.league.i + '|' + p.after + '|' + p.kept.map(function(x){ return x.id; }).join(',') + '|' + p.bought.map(function(x){ return x.id; }).join(',') + '|' +
+      free.map(function(m){ return m.id + ':' + m.price; }).join(',') + '|' + !!state.forms + '|' + horizon + '|' + (state.opp ? state.opp.at : 0);
+    if (buyCache.key !== key){
+      var clubs = {};
+      p.kept.concat(p.bought).forEach(function(x){ if (x.tid != null) clubs[x.tid] = (clubs[x.tid] || 0) + 1; });
+      var keptValue = p.kept.reduce(function(s, x){ return s + x.mv; }, 0);
+      var cand = free.map(function(m){ var e = calcEntry(m); e.price = m.price; e.tid = m.tid; e.trend = m.mvt || 0; return e; });
+      buyCache = {key: key, value: C.recommendBuys(p.kept.map(calcEntry), p.bought.map(calcEntry), cand, {
+        after: p.after, teamValue: keptValue, squadLimit: ov.mppu, clubLimit: ov.mpst, clubCounts: clubs
+      })};
+    }
+    return buyCache.value;
+  }
+  function marketById(id){ return state.market.filter(function(m){ return m.id === id; })[0] || null; }
+
+  function buyHtml(){
+    var a = buyAdvice();
+    if (!a) return '';
+    var html = '<div class="advice"><div class="advice-head"><b>Kaufen lohnt sich</b><span class="num mut">' + (horizon === 1 ? 'nächstes Spiel' : 'nächste 3 Spiele') + '</span></div>';
+    if (!a.list.length) return html + '<p class="advice-note">Gerade verbessert kein Marktspieler deine beste Elf genug, auch nicht mit Verkauf.</p></div>';
+    a.list.slice(0, 3).forEach(function(r){
+      var m = marketById(r.id);
+      if (!m) return;
+      var meta = ['<span class="up">+' + Math.round(r.net) + ' P/Spieltag</span>', short(r.price)];
+      var fx = fixtureHtml(m);
+      if (fx) meta.push(fx);
+      if (!r.ok) meta.push('<span class="neg">über der 33%-Grenze</span>');
+      var sells = r.sells.map(function(id){ var x = playerById(id); return x ? escapeHtml(x.name) : ''; }).filter(Boolean);
+      html += '<div class="advice-opt"><div class="main">' +
+        '<div class="advice-title">' + POS_LABEL[m.pos] + (m.by ? ' · Angebot von ' + escapeHtml(m.by) : '') + '</div>' +
+        '<div class="advice-names">' + escapeHtml(m.name) + '</div>' +
+        '<div class="advice-meta num">' + meta.join(' · ') + '</div>' +
+        (sells.length ? '<div class="advice-meta num">dafür verkaufen: ' + sells.join(', ') + ' (+' + short(r.money) + (plan().after < 0 ? ', deckt auch das jetzige Minus' : '') + ')</div>' : '') +
+        '</div><button type="button" class="btn" data-buyadvice="' + r.id + '">Vormerken</button></div>';
+    });
+    return html + '<p class="advice-note">Dieselben erwarteten Punkte wie bei den Verkäufen: Form, Einsatzchance, Ausfälle und Gegner. Gerechnet mit dem Angebotspreis; wie hoch du über dem Marktwert bieten musst, hängt von den Mitbietern ab (Bietkraft im Gegner-Tab).</p></div>';
+  }
+
+  function applyBuy(id){
+    var a = buyAdvice(), r = a && a.list.filter(function(x){ return x.id === id; })[0], m = marketById(id);
+    if (!r || !m) return;
+    state.bids[id] = m.price;
+    r.sells.forEach(function(sid){ state.sell[sid] = true; });
+    // Die Empfehlung rechnet mit der besten Elf, also auch so aufstellen
+    var pool = lineupPool().filter(function(x){ return !state.sell[x.id]; }).map(calcEntry);
+    state.lineup = buildLineup(C.bestEleven(pool).formation || state.lineup.formation, bestIds());
+    state.pick = null;
+    var sold = r.sells.map(function(sid){ var x = playerById(sid); return x ? x.name : ''; }).filter(Boolean);
+    state.lineupNote = m.name + ' vorgemerkt (Gebot ' + short(m.price) + ')' + (sold.length ? ', dafür ' + sold.join(', ') + ' zum Verkauf' : '') +
+      '. Neue Elf: ' + state.lineup.formation + '.';
+    saveLineup();
+  }
+
   function squadPanel(compact){
     var total = state.players.reduce(function(s, p){ return s + p.mv; }, 0);
     var html = '<section class="panel"><div class="panel-head"><h2>Kader</h2><span class="num">' +
@@ -813,6 +879,8 @@
       '<button type="button" data-kview="list" class="' + (kaderView === 'list' ? 'on' : '') + '">Liste</button></div>';
     html += horizonHtml();
     html += adviceHtml();
+    var best = !compact && buyAdvice(), top = best && best.list[0] && marketById(best.list[0].id);
+    if (top) html += '<button type="button" class="buy-hint" data-goto="markt"><span>Kauftipp: <b>' + escapeHtml(top.name) + '</b> · <span class="up">+' + Math.round(best.list[0].net) + ' P/Spieltag</span></span><span aria-hidden="true">›</span></button>';
     if (kaderView === 'pitch' && state.lineup) return html + lineupHtml(compact) + '</section>';
     POS_ORDER.concat(["–"]).forEach(function(pos){
       var list = state.players.filter(function(p){ return p.pos === pos; });
@@ -844,6 +912,8 @@
       if (state.nextKickoff && left != null && Date.now() + left * 1000 > state.nextKickoff) sub.push('nach Anpfiff');
     }
     if (p.bids) sub.push(p.bids + ' Gebot' + (p.bids > 1 ? 'e' : ''));
+    var ba = !marked && buyAdvice(), g = ba && ba.gains[p.id];
+    if (g >= 0.5) sub.push('<span class="up">+' + Math.round(g) + ' P Elf</span>');
     var fxm = fixtureHtml(p);
     if (fxm) sub.push(fxm);
     if (!compact && state.clubNames[p.tid]) sub.push(escapeHtml(state.clubNames[p.tid]));
@@ -864,6 +934,7 @@
   function marketPanel(compact){
     var html = '<section class="panel"><div class="panel-head"><h2>Markt</h2><span>läuft zuerst ab</span></div>';
     if (!state.market.length) return html + '<div class="empty">Gerade steht niemand auf dem Transfermarkt.</div></section>';
+    html += buyHtml();
     var free = state.market.filter(function(p){ return !p.by; });
     var offers = state.market.filter(function(p){ return p.by; });
     free.sort(function(a, b){ return (a.expires || 0) - (b.expires || 0); });
@@ -1098,6 +1169,12 @@
         var picker = document.querySelector('#body .picker');
         if (picker && picker.scrollIntoView) picker.scrollIntoView({block: 'nearest', behavior: 'smooth'});
       });
+    });
+    each('#body [data-buyadvice]', function(b){
+      b.addEventListener('click', function(){ applyBuy(b.getAttribute('data-buyadvice')); render(); });
+    });
+    each('#body [data-goto]', function(b){
+      b.addEventListener('click', function(){ setTab(b.getAttribute('data-goto')); });
     });
     each('#body [data-advice]', function(b){
       b.addEventListener('click', function(){ applyAdvice(b.getAttribute('data-advice')); render(); });

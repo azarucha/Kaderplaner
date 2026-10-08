@@ -259,3 +259,49 @@ test('Verkaufsempfehlung: schwerer Gegner und Konstanz entscheiden bei sonst gle
   const cons = [{ id: 'fest', pos: 'ANG', mv: 5e6, ap: 50, cons: 0.9 }, { id: 'wackel', pos: 'ANG', mv: 5e6, ap: 50, cons: 0.3 }];
   assert.deepEqual(C.recommendSales(base.concat(cons), 4e6).points.ids, ['wackel']);
 });
+
+// ---------- Kaufempfehlung ----------
+function elf(){
+  return [
+    { id: 'tw', pos: 'TW', mv: 2e6, ap: 100 },
+    { id: 'a1', pos: 'ABW', mv: 2e6, ap: 100 }, { id: 'a2', pos: 'ABW', mv: 2e6, ap: 100 }, { id: 'a3', pos: 'ABW', mv: 2e6, ap: 100 },
+    { id: 'a4', pos: 'ABW', mv: 2e6, ap: 40 },
+    { id: 'm1', pos: 'MF', mv: 2e6, ap: 100 }, { id: 'm2', pos: 'MF', mv: 2e6, ap: 100 }, { id: 'm3', pos: 'MF', mv: 2e6, ap: 100 },
+    { id: 'm4', pos: 'MF', mv: 2e6, ap: 100 },
+    { id: 's1', pos: 'ANG', mv: 2e6, ap: 100 }, { id: 's2', pos: 'ANG', mv: 2e6, ap: 30 }
+  ];
+}
+
+test('Kaufempfehlung: wer einen schwachen Stammspieler verdraengt, bringt die Differenz', () => {
+  const squad = elf();
+  const r = C.recommendBuys(squad, [], [
+    { id: 'gut', pos: 'ANG', price: 3e6, ap: 110 },     // ersetzt s2 (30): +80
+    { id: 'bank', pos: 'TW', price: 1e6, ap: 60 }       // schlechter als der Torwart: kein Gewinn
+  ], { after: 10e6, teamValue: 22e6 });
+  assert.equal(r.gains.gut, 80);
+  assert.equal(r.gains.bank, 0);
+  assert.deepEqual(r.list.map(x => x.id), ['gut']);
+  assert.deepEqual(r.list[0].sells, []);
+  assert.equal(r.list[0].after, 7e6);
+  assert.ok(r.list[0].ok);
+});
+
+test('Kaufempfehlung: ohne Geld wird der danach ueberfluessige Spieler verkauft', () => {
+  const squad = elf().concat([{ id: 'teuer', pos: 'MF', mv: 6e6, ap: 20 }]);   // Bank, viel wert
+  const r = C.recommendBuys(squad, [], [{ id: 'gut', pos: 'ANG', price: 5e6, ap: 110 }], { after: 0, teamValue: 28e6 });
+  assert.equal(r.list.length, 1);
+  assert.deepEqual(r.list[0].sells, ['teuer']);
+  assert.equal(r.list[0].net, 80);
+  assert.ok(r.list[0].after >= 0);
+});
+
+test('Kaufempfehlung: Vereinslimit schliesst aus, Sortierung nach Punkten und Preis', () => {
+  const squad = elf().map(p => ({ ...p, tid: 'x' }));
+  const market = [
+    { id: 'billig', pos: 'ANG', price: 1e6, ap: 110 },
+    { id: 'teuer', pos: 'ANG', price: 8e6, ap: 110 },
+    { id: 'gleicherVerein', pos: 'ANG', price: 1e6, ap: 200, tid: 'x' }
+  ];
+  const r = C.recommendBuys(squad, [], market, { after: 20e6, teamValue: 22e6, clubLimit: 3, clubCounts: { x: 11 } });
+  assert.deepEqual(r.list.map(x => x.id), ['billig', 'teuer']);
+});

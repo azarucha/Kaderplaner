@@ -511,8 +511,64 @@
     return out;
   }
 
+  // Kaufempfehlung auf derselben Grundlage wie die Verkaeufe: Wie viele erwartete
+  // Punkte gewinnt die beste Elf pro Spieltag mit diesem Marktspieler dazu? Reicht
+  // das Geld nicht (oder ist der Kader voll), rechnet recommendSales mit, wer dafuer
+  // gehen soll; empfohlen wird nur, was unterm Strich Punkte bringt.
+  //   sellable: eigene Spieler nach Plan, fixed: vorgemerkte Kaeufe,
+  //   market: [{id, pos, price, tid, ap, form, fixture, status, trend, cons}]
+  //   opts: after (Konto nach Plan), teamValue (Wert nach Plan), squadLimit,
+  //         clubLimit, clubCounts {tid: n}, finance (wie viele Kandidaten mit Verkauf)
+  function recommendBuys(sellable, fixed, market, opts){
+    opts = opts || {};
+    sellable = sellable || []; fixed = fixed || [];
+    var squad = sellable.concat(fixed), after = opts.after || 0;
+    var have = {};
+    squad.forEach(function(p){ have[p.id] = true; });
+    var base = bestEleven(squad).points;
+    // Steht das Konto schon im Minus, ist der Vergleich die Elf nach den noetigen Verkaeufen
+    var ref = base;
+    if (after < 0){
+      var fix = recommendSales(sellable, -after, {fixed: fixed, maxN: 14});
+      ref = fix.points ? fix.points.points : -Infinity;
+    }
+    var full = opts.squadLimit && squad.length >= opts.squadLimit;
+    var gains = {}, list = [];
+    (market || []).forEach(function(m){
+      if (have[m.id]) return;
+      if (opts.clubLimit && m.tid != null && ((opts.clubCounts || {})[m.tid] || 0) >= opts.clubLimit) return;
+      var gain = bestEleven(squad.concat([m])).points - base;
+      gains[m.id] = gain;
+      if (gain >= 0.5) list.push({m: m, gain: gain});
+    });
+    list.sort(function(a, b){ return b.gain - a.gain; });
+    var out = [];
+    list.slice(0, opts.finance || 5).forEach(function(c){
+      var m = c.m, price = m.price || 0;
+      var need = Math.max(price - after, full ? 1 : 0), sells = [], money = 0, soldValue = 0, points = base + c.gain;
+      if (need > 0){
+        var r = recommendSales(sellable, need, {fixed: fixed.concat([m]), maxN: 14});
+        if (!r.points) return;
+        sells = r.points.ids; money = r.points.money; points = r.points.points;
+        sellable.forEach(function(p){ if (sells.indexOf(p.id) >= 0) soldValue += p.mv || 0; });
+      }
+      var net = points - ref;
+      if (net < 0.5) return;
+      // 33%-Regel im Moment des Gebots: Verkaeufe sind gebucht, das Gebot zaehlt als offen
+      var room = bidRoom((opts.teamValue || 0) - soldValue, after + money, price);
+      out.push({id: m.id, gain: c.gain, net: net, price: price, perMio: net / Math.max(0.1, price / 1e6),
+        sells: sells, money: money, after: after + money - price, ok: room.headroom >= 0,
+        trend: m.trend || 0, cons: m.cons != null ? m.cons : 0.6});
+    });
+    out.sort(function(a, b){
+      return Math.round(b.net) - Math.round(a.net) || b.perMio - a.perMio || b.trend - a.trend || b.cons - a.cons;
+    });
+    return {base: base, ref: ref, gains: gains, list: out};
+  }
+
   return {
     FORMATIONS: FORMATIONS,
+    recommendBuys: recommendBuys,
     availability: availability,
     expectedPoints: expectedPoints,
     formFromPerformance: formFromPerformance,
