@@ -1,0 +1,6 @@
+/* Geist, lokal ausgeliefert (SIL Open Font License 1.1, siehe OFL.txt).
+   Keine Anfrage an fremde Server, damit keine Besucher-IP an Dritte geht. */
+@font-face{ font-family:Geist; font-style:normal; font-weight:400; font-display:swap; src:url(geist-latin-400.woff2) format("woff2"); }
+@font-face{ font-family:Geist; font-style:normal; font-weight:500; font-display:swap; src:url(geist-latin-500.woff2) format("woff2"); }
+@font-face{ font-family:Geist; font-style:normal; font-weight:600; font-display:swap; src:url(geist-latin-600.woff2) format("woff2"); }
+@font-face{ font-family:Geist; font-style:normal; font-weight:700; font-display:swap; src:url(geist-latin-700.woff2) format("woff2"); }

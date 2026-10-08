@@ -37,6 +37,7 @@ write('dist/web/demo.html', demo);
 write('dist/web/manifest.webmanifest', read('web/manifest.webmanifest'));
 write('dist/web/sw.js', read('web/sw.js').replace('__VERSION__', version));
 fs.cpSync(path.join(root, 'web/icons'), path.join(root, 'dist/web/icons'), { recursive: true });
+fs.cpSync(path.join(root, 'web/fonts'), path.join(root, 'dist/web/fonts'), { recursive: true });
 // GitHub Pages soll die Dateien unveraendert ausliefern
 write('dist/web/.nojekyll', '');
 

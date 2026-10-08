@@ -1,9 +1,13 @@
 # Kaderplaner für Kickbase
 
-Eine iPhone-App (über [Scriptable](https://scriptable.app)) für den Fußball-Manager
-[Kickbase](https://www.kickbase.com). Sie zeigt, was die Kickbase-App selbst nicht
-zeigt: wie viel Geld die anderen Manager deiner Liga haben und wer bei einem Spieler
-überhaupt mitbieten kann.
+Web-App und iPhone-App (über [Scriptable](https://scriptable.app)) für den
+Fußball-Manager Kickbase. Sie zeigt, was die Kickbase-App selbst nicht zeigt: wie
+viel Geld die anderen Manager deiner Liga haben und wer bei einem Spieler überhaupt
+mitbieten kann.
+
+> Inoffizielles Hobbyprojekt, nicht mit Kickbase verbunden. Es nutzt die nicht
+> dokumentierte Web-Schnittstelle nur lesend und kann jederzeit aufhören zu
+> funktionieren, wenn Kickbase daran etwas ändert.
 
 <p align="center">
   <img src="docs/screenshots/kader.jpg" width="260" alt="Kader mit Kontostand, Spielraum und Verkaufsplanung">
@@ -131,13 +135,29 @@ Schritt gegen den echten Kontostand geprüft, bis die Abweichung im Rauschen lag
 ## Hinweise
 
 - Inoffizielles Projekt, nicht mit Kickbase verbunden. Es nutzt die nicht
-  dokumentierte Web-API, die sich jederzeit ändern kann.
+  dokumentierte Web-API, die sich jederzeit ändern kann. Es gibt keinen Support und
+  keine Zusagen für neue Funktionen.
 - Die App **liest nur**. Sie gibt keine Gebote ab, verkauft nichts und ändert keine
   Aufstellung.
-- Der Token bleibt auf dem Gerät (iOS-Keychain) und wird ausschließlich an
-  `api.kickbase.com` gesendet.
 - Die Gegnerwerte sind Schätzungen. Unsicher bleiben vor allem die Auflaufprämie
   (loggt jemand täglich ein?) und ältere Mannschaftswert-Erfolge.
+
+## Datenschutz
+
+- Es gibt keinen eigenen Server, kein Tracking und keine Werbung. Die App ist eine
+  statische Seite, die direkt im Browser mit `api.kickbase.com` spricht.
+- E-Mail und Passwort gehen beim Anmelden nur an Kickbase und werden nicht
+  gespeichert. Auf dem Gerät bleibt nur der Zugangstoken (im Browser-Speicher bzw.
+  in der iOS-Keychain), bis du dich abmeldest.
+- Die Schrift [Geist](https://github.com/vercel/geist-font) wird mitgeliefert
+  (SIL Open Font License), es werden keine Inhalte von Drittservern nachgeladen.
+- Die Web-Version liegt auf GitHub Pages; dort gilt das
+  [GitHub Privacy Statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement).
+
+## Unterstützen
+
+Der Kaderplaner ist kostenlos und bleibt es. Wenn er dir beim Bieten hilft, freue ich
+mich über einen Kaffee auf [Ko-fi](https://ko-fi.com/azarucha).
 
 ## Lizenz
 
