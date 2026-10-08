@@ -1,6 +1,6 @@
 // Service Worker: haelt die App-Huelle offline vor. Kickbase-Daten gehen immer
 // direkt ans Netz und werden nie zwischengespeichert.
-const CACHE = "kaderplaner-92c5d0e507";
+const CACHE = "kaderplaner-db745d02a6";
 const SHELL = ["./", "index.html", "demo.html", "manifest.webmanifest", "icons/icon-192.png", "icons/apple-touch-icon.png"];
 
 self.addEventListener("install", (e) => {

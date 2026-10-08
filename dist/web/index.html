@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kaderplaner</title>
-<meta name="theme-color" content="#121014">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e0e0e" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -19,26 +20,32 @@
   }
 </script>
 
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;display=swap">
 <style>
-/* Kaderplaner - Design "Matchday" */
+/* Kaderplaner - schlichtes Design: eine Schrift, Schwarz/Weiss, ein Akzent.
+   Gruen nur fuer den Spielraum, Rot nur fuer Verluste und Warnungen. */
 :root{
-  --bg:#f6f3ee; --surf:#ffffff; --surf2:#f0ebe3; --ink:#1d1a16; --mut:#776e63; --line:#ebe4da;
-  --acc:#ff5a1f; --acc2:#7b2ff7; --pos:#0a8a56; --neg:#d9342a; --neg-soft:#fde6e3; --warn-soft:#fff1d6; --warn:#9a5b00;
-  --shadow:0 1px 3px rgba(40,30,20,.08);
+  --bg:#ffffff; --side:#fafaf9; --ink:#111111; --mut:#6b6b6b; --faint:#8a8a87;
+  --line:#ececea; --line2:#f0f0ee; --btn-line:#dcdcd9; --hi:#f6f6f4; --chip:#efefed;
+  --acc:#1a7f4e; --neg:#b42318; --warn:#8a5300;
+  --inv-bg:#111111; --inv-ink:#ffffff;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#121014; --surf:#1d1a20; --surf2:#29252e; --ink:#f4f0f8; --mut:#a49cae; --line:#2e2934;
-    --acc:#ff7a45; --acc2:#9d6bff; --pos:#3ddc97; --neg:#ff6b61; --neg-soft:#3b1b1a; --warn-soft:#3a2b10; --warn:#ffc266;
-    --shadow:0 1px 3px rgba(0,0,0,.4);
+    --bg:#0e0e0e; --side:#131313; --ink:#f2f2f0; --mut:#9a9a96; --faint:#77777a;
+    --line:#262626; --line2:#1c1c1c; --btn-line:#333333; --hi:#181818; --chip:#222222;
+    --acc:#3fb37a; --neg:#ff7a6b; --warn:#f0b45a;
+    --inv-bg:#f2f2f0; --inv-ink:#0e0e0e;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#121014; --surf:#1d1a20; --surf2:#29252e; --ink:#f4f0f8; --mut:#a49cae; --line:#2e2934;
-  --acc:#ff7a45; --acc2:#9d6bff; --pos:#3ddc97; --neg:#ff6b61; --neg-soft:#3b1b1a; --warn-soft:#3a2b10; --warn:#ffc266;
-  --shadow:0 1px 3px rgba(0,0,0,.4);
+  --bg:#0e0e0e; --side:#131313; --ink:#f2f2f0; --mut:#9a9a96; --faint:#77777a;
+  --line:#262626; --line2:#1c1c1c; --btn-line:#333333; --hi:#181818; --chip:#222222;
+  --acc:#3fb37a; --neg:#ff7a6b; --warn:#f0b45a;
+  --inv-bg:#f2f2f0; --inv-ink:#0e0e0e;
   color-scheme: dark;
 }
 
@@ -46,171 +53,247 @@
 html,body{ margin:0; padding:0; }
 body{
   background:var(--bg); color:var(--ink);
-  font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
-  -webkit-font-smoothing:antialiased; min-height:100vh; overscroll-behavior-y:none;
+  font-family:Geist, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size:15px; line-height:1.4; -webkit-font-smoothing:antialiased; overscroll-behavior-y:none;
 }
-h1,h2,h3{ margin:0; text-wrap:balance; }
-button{ font:inherit; color:inherit; border:0; background:none; cursor:pointer; padding:0; }
+h1,h2,h3,p{ margin:0; }
+button,input,textarea{ font:inherit; color:inherit; }
+button{ background:none; border:0; padding:0; cursor:pointer; }
 [hidden]{ display:none !important; }
-.mono{ font-variant-numeric:tabular-nums; }
-.up{ color:var(--pos); } .dn{ color:var(--neg); }
-.app{ max-width:520px; margin:0 auto; min-height:100vh; position:relative; }
-
-/* ---------- Setup ---------- */
-.setup{ min-height:100vh; display:flex; flex-direction:column; justify-content:center; gap:24px; padding:max(28px, env(safe-area-inset-top)) 20px 32px; }
-.brand{ display:flex; flex-direction:column; gap:8px; align-items:center; text-align:center; }
-.brand-badge{ width:60px; height:60px; border-radius:18px; background:linear-gradient(135deg,var(--acc),var(--acc2)); display:grid; place-items:center; font-weight:800; font-size:22px; color:#fff; box-shadow:0 12px 26px -12px var(--acc2); }
-.brand h1{ font-size:24px; letter-spacing:-.02em; }
-.brand p{ color:var(--mut); font-size:14px; margin:0; max-width:32ch; }
-.field-label{ display:block; font-size:12px; font-weight:700; color:var(--mut); margin-bottom:8px; }
-textarea#tokenInput{ width:100%; min-height:92px; resize:vertical; background:var(--surf); color:var(--ink); border:1px solid var(--line); border-radius:16px; padding:14px; font:12px/1.5 ui-monospace, Menlo, monospace; }
-textarea#tokenInput:focus{ outline:2px solid var(--acc); outline-offset:2px; }
-.btn-primary{ width:100%; padding:15px; border-radius:16px; font-weight:800; font-size:15px; color:#fff; background:linear-gradient(135deg,var(--acc),var(--acc2)); }
-.btn-primary:disabled{ opacity:.55; }
-.login{ display:flex; flex-direction:column; gap:10px; }
-.login input{ width:100%; font:16px inherit; font-family:inherit; padding:14px; border-radius:14px; border:1px solid var(--line); background:var(--surf); color:var(--ink); }
-.login input:focus{ outline:2px solid var(--acc); outline-offset:1px; }
-.btn-secondary{ width:100%; margin-top:10px; padding:12px; border-radius:14px; font-weight:800; font-size:14px; background:var(--surf2); }
-details.howto textarea#tokenInput{ margin-top:12px; min-height:72px; }
-.demo-link{ text-align:center; font-weight:800; font-size:14px; color:var(--acc); text-decoration:none; }
+.num{ font-variant-numeric:tabular-nums; }
+.neg{ color:var(--neg); } .acc{ color:var(--acc); } .mut{ color:var(--mut); }
+.desk-only{ display:none !important; }
 .is-scriptable .web-only{ display:none !important; }
-.demo-badge{ position:fixed; bottom:calc(max(14px, env(safe-area-inset-bottom)) + 64px); left:50%; transform:translateX(-50%); z-index:50; background:var(--ink); color:var(--bg); font-size:11.5px; font-weight:800; padding:6px 12px; border-radius:20px; text-decoration:none; box-shadow:0 6px 18px -8px rgba(0,0,0,.5); white-space:nowrap; }
-.demo-badge b{ color:var(--acc); }
-details.howto{ background:var(--surf); border-radius:16px; padding:14px 16px; }
-details.howto summary{ font-weight:700; font-size:14px; list-style:none; display:flex; justify-content:space-between; }
-details.howto summary::-webkit-details-marker{ display:none; }
-details.howto summary::after{ content:"+"; color:var(--mut); }
-details.howto[open] summary::after{ content:"–"; }
-details.howto ol{ margin:12px 0 0; padding-left:20px; font-size:13.5px; color:var(--mut); line-height:1.6; }
-code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-monospace, Menlo, monospace; color:var(--ink); }
-.status-msg{ font-size:13px; text-align:center; padding:10px 14px; border-radius:12px; background:var(--neg-soft); color:var(--neg); font-weight:600; }
-.footer-note{ text-align:center; font-size:11.5px; color:var(--mut); padding:4px 20px 0; margin:0; line-height:1.5; }
 
-/* ---------- Header + Hero ---------- */
-.hd{ padding:max(14px, env(safe-area-inset-top)) 14px 0; display:flex; justify-content:space-between; align-items:center; gap:10px; }
-.pill{ background:var(--surf); border-radius:20px; padding:8px 13px; font-weight:800; font-size:14px; box-shadow:var(--shadow); max-width:62vw; display:flex; gap:6px; align-items:center; }
-.pill span:first-child{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.caret{ color:var(--mut); font-size:12px; }
-.hd-actions{ display:flex; gap:8px; }
-.round{ width:36px; height:36px; border-radius:50%; background:var(--surf); box-shadow:var(--shadow); display:grid; place-items:center; font-size:16px; }
-.round.avatar{ background:linear-gradient(135deg,var(--acc),var(--acc2)) center/cover; }
-.round.spin{ animation:spin .8s linear infinite; }
+/* ---------- Logo ---------- */
+.wordmark{ display:flex; align-items:center; gap:10px; font-size:16px; font-weight:600; }
+.logo-bg{ fill:var(--ink); } .logo-fg{ fill:var(--bg); } .logo-track{ fill:var(--bg); opacity:.32; } .logo-acc{ fill:var(--acc); }
 
-.hero{ margin:12px 14px 0; border-radius:22px; padding:16px 18px; color:#fff; background:linear-gradient(135deg,var(--acc) 0%, var(--acc2) 100%); box-shadow:0 14px 30px -16px var(--acc2); }
-.hero.neg{ background:linear-gradient(135deg,#e0362c 0%, var(--acc2) 100%); }
-.hero-l{ font-size:12px; opacity:.85; font-weight:700; }
-.hero-v{ font-size:31px; font-weight:800; letter-spacing:-.02em; margin-top:1px; }
-.hero-g{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:12px; }
-.hero-g div{ background:rgba(255,255,255,.17); border-radius:12px; padding:8px 9px; min-width:0; }
-.hero-g span{ font-size:10.5px; opacity:.9; display:block; }
-.hero-g b{ display:block; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.hero-sub{ font-size:11.5px; opacity:.9; margin-top:10px; }
-.hero-sub:empty{ display:none; }
+/* ---------- Anmelden ---------- */
+.setup{ min-height:100vh; display:flex; justify-content:center; padding:max(56px, env(safe-area-inset-top)) 24px 32px; }
+.setup-inner{ width:100%; max-width:400px; display:flex; flex-direction:column; }
+.setup-title{ margin-top:48px; font-size:32px; font-weight:600; letter-spacing:-.03em; line-height:1.15; }
+.setup-lead{ margin-top:12px; font-size:16px; line-height:1.5; color:var(--mut); }
+.login{ display:flex; flex-direction:column; gap:12px; margin-top:36px; }
+.login label{ display:flex; flex-direction:column; gap:6px; font-size:13px; color:var(--mut); }
+.login input, .token-way textarea{
+  width:100%; height:50px; padding:0 14px; border:1px solid var(--btn-line); border-radius:12px;
+  background:var(--bg); color:var(--ink); font-size:16px;
+}
+.login input::placeholder, .token-way textarea::placeholder{ color:var(--faint); }
+.login input:focus, .token-way textarea:focus{ outline:2px solid var(--ink); outline-offset:1px; }
+.btn-primary{ height:52px; margin-top:8px; border-radius:12px; background:var(--inv-bg); color:var(--inv-ink); font-size:16px; font-weight:600; }
+.btn-primary:disabled{ opacity:.5; }
+.btn-secondary{ width:100%; height:46px; margin-top:10px; border-radius:12px; border:1px solid var(--btn-line); font-weight:500; }
+#setupStatus:not(:empty){ margin-top:14px; }
+.status-msg{ font-size:14px; color:var(--neg); }
+.token-way{ margin-top:8px; }
+.token-way summary{ list-style:none; min-height:44px; display:flex; align-items:center; font-size:14px; color:var(--mut); text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+.token-way summary::-webkit-details-marker{ display:none; }
+.token-way ol{ margin:4px 0 0; padding-left:18px; font-size:13.5px; line-height:1.6; color:var(--mut); }
+.token-way textarea{ height:84px; padding:12px 14px; margin-top:12px; resize:vertical; font:12px/1.5 ui-monospace, Menlo, monospace; }
+code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:1px 5px; border-radius:5px; color:var(--ink); }
+.demo-card{ display:flex; align-items:center; justify-content:space-between; min-height:58px; margin-top:40px; padding:0 16px; border:1px solid var(--line); border-radius:12px; color:var(--ink); text-decoration:none; }
+.demo-card b{ display:block; font-size:15px; font-weight:600; }
+.demo-card small{ display:block; font-size:13px; color:var(--mut); margin-top:2px; }
+.fine{ margin-top:16px; font-size:12px; line-height:1.5; color:var(--mut); }
 
-.alert{ margin:8px 14px 0; border-radius:14px; padding:9px 12px; font-size:12.5px; font-weight:700; background:var(--neg-soft); color:var(--neg); }
-.alert.warn{ background:var(--warn-soft); color:var(--warn); }
+/* ---------- Grundgeruest ---------- */
+.shell{ min-height:100vh; }
+.side{ display:none; }
+.content{ padding-bottom:calc(96px + env(safe-area-inset-bottom)); }
+
+.top{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:max(12px, env(safe-area-inset-top)) 8px 0 20px; }
+.league-btn{ display:flex; align-items:center; gap:6px; min-height:44px; font-size:17px; font-weight:600; min-width:0; }
+.league-btn span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.league-btn svg{ color:var(--mut); flex:none; }
+.page-title{ display:none; }
+.top-actions{ display:flex; gap:2px; }
+.icon-btn{ min-width:44px; height:44px; display:flex; align-items:center; justify-content:center; gap:8px; border-radius:10px; }
+.icon-btn.spin svg{ animation:spin .8s linear infinite; }
+
+/* ---------- Kennzahlen ---------- */
+.summary{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); margin:0 20px; }
+.sum-main{ grid-column:1 / -1; padding:20px 0 18px; }
+.lbl{ font-size:12px; color:var(--mut); }
+.sum-main .lbl{ font-size:13px; }
+.big{ font-size:40px; font-weight:600; letter-spacing:-.03em; line-height:1.15; margin-top:2px; }
+.big.neg{ color:var(--neg); }
+.sum-stat{ padding:12px 0 12px 14px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); border-left:1px solid var(--line); min-width:0; }
+.sum-main + .sum-stat{ padding-left:0; border-left:0; }
+.val{ font-size:17px; font-weight:600; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.val.neg{ color:var(--neg); }
+.cap{ font-size:12px; color:var(--mut); margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.meter{ height:4px; border-radius:2px; background:var(--line); overflow:hidden; }
+.meter-fill{ display:block; height:100%; width:0; background:var(--acc); transition:width .2s; }
+.meter-fill.neg{ background:var(--neg); }
+.meter-row{ padding:14px 20px 0; }
+.meter-cap{ display:flex; justify-content:space-between; gap:12px; font-size:12px; color:var(--mut); margin-top:7px; }
+
+.alerts:not(:empty){ padding:14px 20px 0; display:flex; flex-direction:column; gap:6px; }
+.alert{ display:flex; gap:10px; align-items:baseline; font-size:13.5px; line-height:1.45; }
+.alert::before{ content:""; flex:none; width:7px; height:7px; border-radius:50%; background:var(--neg); transform:translateY(-1px); }
+.alert.soft::before{ background:var(--warn); }
 
 /* ---------- Listen ---------- */
-#body{ padding-bottom:110px; }
-.ttl{ padding:18px 18px 8px; display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
-.ttl b{ font-size:17px; letter-spacing:-.01em; }
-.ttl span{ font-size:12px; color:var(--mut); }
-.card{ margin:0 14px 8px; background:var(--surf); border-radius:16px; padding:10px 12px; display:flex; gap:10px; align-items:center; box-shadow:var(--shadow); }
-.card.sold{ box-shadow:inset 0 0 0 2px var(--neg); }
-.card.bought{ box-shadow:inset 0 0 0 2px var(--acc); }
-.ph{ width:38px; height:38px; border-radius:12px; background:var(--surf2) center/cover no-repeat; flex:none; position:relative; }
-.ph i{ position:absolute; left:-4px; bottom:-4px; font-style:normal; font-size:9px; font-weight:800; background:var(--surf); color:var(--mut); border-radius:6px; padding:1px 4px; box-shadow:var(--shadow); }
-.mid{ flex:1; min-width:0; }
-.mid .n{ font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.mid .m{ font-size:11.5px; color:var(--mut); margin-top:2px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
-.rt{ text-align:right; flex:none; }
-.rt b{ font-size:13.5px; display:block; }
-.rt small{ font-size:11px; font-weight:700; }
-.act{ font-size:11.5px; font-weight:800; padding:8px 10px; border-radius:10px; background:var(--surf2); flex:none; min-width:74px; text-align:center; }
-.act.sell{ background:var(--neg); color:#fff; }
-.act.buy{ background:var(--ink); color:var(--bg); }
-.tag{ font-size:10.5px; font-weight:800; padding:2px 7px; border-radius:20px; background:var(--surf2); color:var(--mut); white-space:nowrap; }
-.tag.hot{ background:var(--acc); color:#fff; }
-.tag.bad{ background:var(--neg-soft); color:var(--neg); }
-.dot{ width:7px; height:7px; border-radius:50%; background:var(--neg); display:inline-block; }
-.card.bought.open{ border-radius:16px 16px 0 0; margin-bottom:0; box-shadow:inset 2px 0 0 var(--acc), inset -2px 0 0 var(--acc), inset 0 2px 0 var(--acc); }
-.bid{ margin:0 14px 8px; background:var(--surf); border-radius:0 0 16px 16px; padding:2px 12px 12px 60px; display:flex; align-items:center; gap:8px; font-size:12px; color:var(--mut); box-shadow:inset 2px 0 0 var(--acc), inset -2px 0 0 var(--acc), inset 0 -2px 0 var(--acc); }
-.bid input{ width:120px; font:700 14px ui-monospace, Menlo, monospace; padding:7px 9px; border-radius:9px; border:1px solid var(--line); background:var(--bg); color:var(--ink); }
-.bid input:focus{ outline:2px solid var(--acc); }
+.panel{ padding-top:24px; }
+.panel-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:0 20px 8px; }
+.panel-head h2{ font-size:20px; font-weight:600; letter-spacing:-.01em; }
+.panel-head span{ font-size:13px; color:var(--mut); }
+.panel-intro{ padding:0 20px 4px; font-size:14px; line-height:1.5; color:var(--mut); }
+.group{ display:flex; justify-content:space-between; padding:14px 20px 6px; font-size:12px; font-weight:600; color:var(--mut); letter-spacing:.04em; text-transform:uppercase; }
+.group span:last-child{ font-weight:500; letter-spacing:0; text-transform:none; }
+.subhead{ display:flex; align-items:baseline; justify-content:space-between; padding:22px 20px 4px; }
+.subhead h3{ font-size:15px; font-weight:600; }
+.subhead span{ font-size:13px; color:var(--mut); }
 
-/* ---------- Gegner ---------- */
-.info{ margin:12px 14px 0; background:var(--surf); border-radius:16px; padding:12px 14px; font-size:12px; color:var(--mut); line-height:1.5; box-shadow:var(--shadow); }
-.info summary{ font-weight:800; color:var(--ink); font-size:13px; list-style:none; display:flex; justify-content:space-between; }
-.info summary::-webkit-details-marker{ display:none; }
-.info summary::after{ content:"+"; color:var(--mut); }
-.info[open] summary::after{ content:"–"; }
-.info p{ margin:8px 0 0; }
-.check{ color:var(--pos); font-weight:700; }
-.check.bad{ color:var(--neg); }
-.rank{ margin:0 14px 8px; background:var(--surf); border-radius:16px; padding:12px 14px; box-shadow:var(--shadow); width:calc(100% - 28px); text-align:left; display:block; }
-.rank .h{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
-.rank .h .n{ font-weight:800; font-size:14.5px; display:flex; align-items:center; gap:6px; min-width:0; }
-.rank .h .n span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.rank .h .p{ font-weight:800; font-size:15px; white-space:nowrap; }
-.rank .bar{ height:12px; border-radius:8px; background:var(--surf2); margin:9px 0 7px; position:relative; overflow:hidden; }
-.rank .bar i{ position:absolute; top:0; bottom:0; left:0; border-radius:8px; background:linear-gradient(90deg,var(--acc),var(--acc2)); }
-.rank .bar s{ position:absolute; top:0; bottom:0; background:repeating-linear-gradient(135deg, rgba(255,255,255,.55) 0 3px, transparent 3px 6px); }
-.rank .m{ font-size:11.5px; color:var(--mut); display:flex; gap:4px 10px; flex-wrap:wrap; }
-.rank.dim{ opacity:.5; }
-.you{ font-size:9.5px; font-weight:800; background:var(--acc); color:#fff; padding:2px 6px; border-radius:6px; flex:none; }
-.opp-squad{ margin-top:10px; border-top:1px solid var(--line); }
-.opp-row{ display:flex; gap:8px; align-items:center; padding:7px 0; border-bottom:1px solid var(--line); font-size:12.5px; }
+.row{ display:flex; align-items:center; gap:12px; min-height:64px; padding:8px 20px; border-top:1px solid var(--line2); }
+.row.on{ background:var(--hi); }
+.pos{ width:30px; flex:none; font-size:11px; font-weight:600; color:var(--faint); }
+.main{ flex:1; min-width:0; }
+.name{ font-size:16px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.row.sold .name{ text-decoration:line-through; }
+.sub{ font-size:13px; color:var(--mut); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sub .urgent{ color:var(--neg); font-weight:600; }
+.dot{ display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--neg); margin-left:6px; vertical-align:middle; }
+.fig{ text-align:right; flex:none; }
+.fig .v{ font-size:16px; font-weight:600; }
+.fig .d{ font-size:13px; margin-top:2px; color:var(--mut); }
+.fig .d.neg{ color:var(--neg); }
+.btn{ flex:none; min-width:92px; min-height:44px; padding:0 12px; border-radius:10px; border:1px solid var(--btn-line); font-size:13px; font-weight:500; }
+.btn.on{ background:var(--inv-bg); color:var(--inv-ink); border-color:var(--inv-bg); }
+.bidrow{ display:flex; align-items:center; gap:10px; padding:0 20px 12px; background:var(--hi); font-size:13px; color:var(--mut); }
+.bidrow input{ flex:1; min-width:0; height:44px; padding:0 12px; border:1px solid var(--btn-line); border-radius:10px; background:var(--bg); color:var(--ink); font-size:16px; font-weight:600; }
+.bidrow input:focus{ outline:2px solid var(--ink); outline-offset:1px; }
+
+/* Gegner */
+.check{ display:flex; align-items:center; gap:8px; padding:4px 20px 8px; font-size:13px; color:var(--mut); }
+.check svg{ color:var(--acc); flex:none; }
+.check.bad svg{ color:var(--neg); }
+.check .text-btn{ margin-left:auto; }
+.text-btn{ min-height:44px; font-size:13px; color:var(--ink); text-decoration:underline; text-underline-offset:3px; }
+.calc{ padding:0 20px 12px; font-size:13.5px; line-height:1.55; color:var(--mut); display:flex; flex-direction:column; gap:8px; }
+.rank{ display:block; width:100%; text-align:left; padding:14px 20px; border-top:1px solid var(--line2); }
+.rank.full{ color:var(--faint); }
+.rank-head{ display:flex; align-items:baseline; gap:10px; }
+.rank-no{ width:16px; flex:none; font-size:13px; color:var(--faint); }
+.rank-name{ flex:1; min-width:0; font-size:16px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rank-power{ font-size:18px; font-weight:600; letter-spacing:-.01em; white-space:nowrap; }
+.rank-bar{ position:relative; height:4px; margin:10px 0 8px 26px; border-radius:2px; background:var(--line); overflow:hidden; }
+.rank-bar i, .rank-bar s{ position:absolute; top:0; bottom:0; background:var(--ink); }
+.rank-bar s{ opacity:.35; }
+.rank.me .rank-bar i, .rank.me .rank-bar s{ background:var(--acc); }
+.rank-meta{ padding-left:26px; font-size:13px; color:var(--mut); }
+.rank-meta.neg{ color:var(--neg); }
+.opp-squad{ margin:10px 0 0 26px; border-top:1px solid var(--line); }
+.opp-row{ display:flex; gap:10px; align-items:center; min-height:40px; border-bottom:1px solid var(--line2); font-size:14px; }
 .opp-row:last-child{ border-bottom:0; }
-.opp-row .pos{ font-size:9.5px; font-weight:800; color:var(--mut); background:var(--surf2); border-radius:6px; padding:2px 0; width:30px; text-align:center; flex:none; }
-.opp-row .nm{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
-.opp-row .v{ text-align:right; flex:none; }
-.opp-row .v small{ display:block; font-size:10.5px; font-weight:700; }
+.opp-row .nm{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.opp-row .v{ text-align:right; font-weight:600; }
+.opp-row .v small{ display:block; font-size:12px; font-weight:400; color:var(--mut); }
+.opp-row .v small.neg{ color:var(--neg); }
 
-/* ---------- Navigation ---------- */
-.nav{ position:fixed; left:50%; transform:translateX(-50%); bottom:max(14px, env(safe-area-inset-bottom)); width:calc(100% - 28px); max-width:492px; display:flex; justify-content:space-around; padding:7px; border-radius:22px; background:var(--ink); color:var(--bg); z-index:30; box-shadow:0 12px 30px -10px rgba(0,0,0,.45); }
-.nav button{ flex:1; font-size:12.5px; font-weight:800; opacity:.6; padding:9px 0; border-radius:16px; color:inherit; }
-.nav button.on{ opacity:1; background:var(--acc); color:#fff; }
+/* ---------- Tab-Leiste (Handy) ---------- */
+.tabbar{ position:fixed; left:0; right:0; bottom:0; z-index:30; display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); padding:6px 0 max(10px, env(safe-area-inset-bottom)); background:var(--bg); border-top:1px solid var(--line); }
+.tabbar button{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; min-height:48px; font-size:11px; font-weight:500; color:var(--faint); }
+.tabbar button.on{ color:var(--ink); font-weight:600; }
 
 /* ---------- Sheet ---------- */
-.sheet-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:40; }
-.sheet{ position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:100%; max-width:520px; background:var(--bg); border-radius:22px 22px 0 0; padding:10px 14px max(18px, env(safe-area-inset-bottom)); z-index:41; max-height:80vh; overflow:auto; }
-.sheet .grab{ width:40px; height:5px; border-radius:3px; background:var(--line); margin:0 auto 10px; }
-.sheet h3{ font-size:16px; margin:4px 4px 10px; }
-.sheet .item{ display:flex; gap:12px; align-items:center; width:100%; text-align:left; background:var(--surf); border-radius:14px; padding:12px; margin-bottom:8px; box-shadow:var(--shadow); }
-.sheet .item.on{ box-shadow:inset 0 0 0 2px var(--acc); }
-.sheet .item img, .sheet .item .ph{ width:40px; height:40px; border-radius:12px; object-fit:cover; background:var(--surf2); }
-.sheet .item b{ display:block; font-size:14.5px; }
-.sheet .item span{ font-size:12px; color:var(--mut); }
-.sheet .item.danger b{ color:var(--neg); }
+.sheet-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:40; }
+.sheet{ position:fixed; left:50%; bottom:0; transform:translateX(-50%); z-index:41; width:100%; max-width:520px; max-height:80vh; overflow:auto; padding:10px 0 max(18px, env(safe-area-inset-bottom)); background:var(--bg); border-radius:16px 16px 0 0; }
+.sheet .grab{ width:36px; height:4px; border-radius:2px; background:var(--line); margin:0 auto 12px; }
+.sheet h3{ padding:0 20px 8px; font-size:13px; font-weight:600; color:var(--mut); text-transform:uppercase; letter-spacing:.04em; }
+.sheet .item{ display:flex; align-items:center; justify-content:space-between; width:100%; min-height:56px; padding:0 20px; border-top:1px solid var(--line2); text-align:left; font-size:16px; }
+.sheet .item span{ font-size:13px; color:var(--mut); }
+.sheet .item.on{ font-weight:600; }
+.sheet .item.danger{ color:var(--neg); }
 
-/* ---------- Diverses ---------- */
-.empty{ padding:50px 30px; text-align:center; color:var(--mut); font-size:14px; line-height:1.5; }
-.link-btn{ color:var(--acc); font-weight:800; font-size:13px; padding:6px; }
-.spinner{ width:24px; height:24px; border-radius:50%; border:3px solid var(--line); border-top-color:var(--acc); animation:spin .7s linear infinite; margin:40px auto; }
-.progress{ text-align:center; color:var(--mut); font-size:12px; margin-top:-26px; }
+/* ---------- Sonstiges ---------- */
+.empty{ padding:56px 30px; text-align:center; color:var(--mut); font-size:14px; line-height:1.5; }
+.spinner{ width:22px; height:22px; border-radius:50%; border:2px solid var(--line); border-top-color:var(--ink); animation:spin .7s linear infinite; margin:40px auto 12px; }
+.progress{ text-align:center; color:var(--mut); font-size:12px; }
 @keyframes spin{ to{ transform:rotate(360deg); } }
+.demo-badge{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(max(10px, env(safe-area-inset-bottom)) + 66px); z-index:50; padding:7px 12px; border-radius:20px; background:var(--inv-bg); color:var(--inv-ink); font-size:12px; font-weight:500; text-decoration:none; white-space:nowrap; }
+.demo-badge b{ font-weight:600; text-decoration:underline; text-underline-offset:2px; }
+
+/* ---------- Desktop ---------- */
+@media (min-width: 1000px){
+  .desk-only{ display:revert !important; }
+  .mobile-only{ display:none !important; }
+  .shell{ display:flex; align-items:stretch; }
+  .side{ display:flex; flex-direction:column; gap:28px; width:240px; flex:none; position:sticky; top:0; height:100vh; padding:28px 20px; background:var(--side); border-right:1px solid var(--line); overflow:auto; }
+  .side .wordmark{ padding:0 8px; }
+  .side-group{ display:flex; flex-direction:column; gap:2px; }
+  .side-label{ padding:0 8px 6px; font-size:12px; font-weight:600; color:var(--mut); letter-spacing:.04em; text-transform:uppercase; }
+  .side-group button{ display:flex; justify-content:space-between; align-items:center; width:100%; min-height:40px; padding:0 8px; border-radius:8px; text-align:left; font-size:14px; color:var(--mut); }
+  .side-group button:hover{ color:var(--ink); }
+  .side-group button.on{ background:var(--chip); color:var(--ink); font-weight:600; }
+  .side-group button span{ font-size:12px; font-weight:500; color:var(--mut); }
+  .side-foot{ margin-top:auto; padding:0 8px; display:flex; flex-direction:column; align-items:flex-start; font-size:13px; color:var(--mut); }
+  .content{ flex:1; min-width:0; padding:32px 40px 48px; }
+  .content > *{ max-width:1180px; }
+  .top{ padding:0; align-items:flex-end; }
+  .league-btn{ display:none; }
+  .page-title{ display:block; min-width:0; }
+  .page-title h1{ font-size:28px; font-weight:600; letter-spacing:-.03em; }
+  .page-sub{ margin-top:4px; font-size:14px; color:var(--mut); }
+  #refreshBtn{ padding:0 14px; height:40px; border:1px solid var(--btn-line); font-size:14px; }
+  .summary{ grid-template-columns:minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); margin:28px 0 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .sum-main{ grid-column:auto; padding:18px 20px 18px 0; }
+  .big{ font-size:32px; }
+  .sum-stat, .sum-main + .sum-stat{ padding:18px 20px; border-top:0; border-bottom:0; border-left:1px solid var(--line); }
+  .val{ font-size:22px; margin-top:8px; }
+  .sum-stat .meter{ margin-top:10px; }
+  .alerts:not(:empty){ padding:16px 0 0; }
+  .tabbar{ display:none; }
+  .demo-badge{ bottom:20px; }
+  .cols{ display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:40px; margin-top:12px; }
+  .cols .panel{ padding-top:24px; }
+  .cols .panel-head{ padding:0 0 10px; border-bottom:1px solid var(--line); }
+  .cols .panel-head h2{ font-size:17px; }
+  .cols .panel-intro, .cols .check, .cols .calc{ padding-left:0; padding-right:0; }
+  .cols .row{ min-height:52px; padding:6px 0; gap:10px; }
+  .cols .name{ font-size:15px; }
+  .cols .fig .v{ font-size:15px; }
+  .cols .btn{ min-width:84px; min-height:36px; font-size:12px; border-radius:8px; }
+  .cols .bidrow{ padding:0 0 10px; }
+  .cols .group, .cols .subhead{ padding-left:0; padding-right:0; }
+  .cols .rank{ padding:12px 0; }
+  .cols .rank-name{ font-size:15px; }
+  .cols .rank-power{ font-size:15px; }
+  .panel-head, .panel-intro, .group, .subhead, .row, .rank, .check, .calc, .bidrow{ padding-left:0; padding-right:0; }
+  .rank-bar, .rank-meta, .opp-squad{ margin-left:0; padding-left:0; }
+  .cols .rank-no{ display:none; }
+  .sheet{ bottom:auto; top:50%; transform:translate(-50%, -50%); border-radius:16px; max-width:420px; }
+}
 
 </style>
 </head>
 <body>
-<div class="app" id="app">
 
-  <!-- SETUP -->
-  <section class="setup" id="screen-setup" hidden>
-    <div class="brand">
-      <div class="brand-badge">KP</div>
-      <h1>Kaderplaner</h1>
-      <p>Kontostand, Limits und die Bietkraft deiner Gegner auf einen Blick.</p>
+<!-- ANMELDEN -->
+<section class="setup" id="screen-setup" hidden>
+  <div class="setup-inner">
+    <div class="wordmark">
+      <svg class="logo" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="7" class="logo-bg"></rect><rect x="6" y="17" width="16" height="3" rx="1.5" class="logo-track"></rect><rect x="6" y="17" width="10" height="3" rx="1.5" class="logo-acc"></rect><rect x="6" y="9" width="3" height="5" rx="1.5" class="logo-fg"></rect><rect x="11" y="7" width="3" height="7" rx="1.5" class="logo-fg"></rect><rect x="16" y="10" width="3" height="4" rx="1.5" class="logo-fg"></rect></svg>
+      <span>Kaderplaner</span>
     </div>
+    <h1 class="setup-title">Kickbase, klar gerechnet.</h1>
+    <p class="setup-lead">Kontostand, Spielraum und die Bietkraft deiner Gegner auf einen Blick.</p>
+
     <form class="login" id="loginForm" autocomplete="on">
-      <label class="field-label" for="loginEmail">Kickbase-Login</label>
-      <input id="loginEmail" type="email" name="username" autocomplete="username" placeholder="E-Mail" autocapitalize="off" autocorrect="off" spellcheck="false" required>
-      <input id="loginPass" type="password" name="password" autocomplete="current-password" placeholder="Passwort" required>
+      <label>E-Mail
+        <input id="loginEmail" type="email" name="username" autocomplete="username" placeholder="name@beispiel.de" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+      </label>
+      <label>Passwort
+        <input id="loginPass" type="password" name="password" autocomplete="current-password" placeholder="Passwort" required>
+      </label>
       <button class="btn-primary" id="loginBtn" type="submit">Anmelden</button>
     </form>
     <div id="setupStatus"></div>
-    <details class="howto">
-      <summary>Lieber mit Token verbinden</summary>
+
+    <details class="token-way">
+      <summary>Stattdessen mit Token verbinden</summary>
       <ol>
         <li><strong>play.kickbase.com</strong> im Browser öffnen und einloggen.</li>
         <li>Am Desktop: F12 → „Application“ (Chrome) bzw. „Storage“ (Firefox) → Local Storage → <code>https://play.kickbase.com</code> → Eintrag <code>kb.t</code>.</li>
@@ -219,45 +302,111 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
       <textarea id="tokenInput" placeholder="eyJhbGciOi…" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
       <button class="btn-secondary" id="connectBtn" type="button">Mit Token verbinden</button>
     </details>
-    <a class="demo-link web-only" href="demo.html">Erst mal ansehen: Demo mit erfundenen Daten →</a>
-    <p class="footer-note">Dein Passwort geht direkt an Kickbase und wird nicht gespeichert. Auf dem Gerät bleibt nur der Zugangstoken. Die App liest nur, sie bietet und verkauft nichts.</p>
-  </section>
 
-  <!-- MAIN -->
-  <section id="screen-main" hidden>
-    <header class="hd">
-      <button class="pill" id="leagueBtn"><span id="leagueName">Liga</span> <span class="caret">▾</span></button>
-      <div class="hd-actions">
-        <button class="round" id="refreshBtn" aria-label="Aktualisieren">↻</button>
-        <button class="round avatar" id="menuBtn" aria-label="Menü"></button>
-      </div>
-    </header>
+    <a class="demo-card web-only" href="demo.html">
+      <span><b>Demo ansehen</b><small>Mit erfundenen Daten, ohne Konto</small></span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path></svg>
+    </a>
+    <p class="fine">Dein Passwort geht nur an Kickbase und wird nicht gespeichert. Die App liest nur, sie bietet und verkauft nichts.</p>
+  </div>
+</section>
 
-    <div class="hero" id="hero">
-      <div class="hero-l">Kontostand</div>
-      <div class="hero-v mono" id="heroBudget">–</div>
-      <div class="hero-g">
-        <div><span>Nach Plan</span><b class="mono" id="heroAfter">–</b></div>
-        <div><span>Spielraum</span><b class="mono" id="heroRoom">–</b></div>
-        <div><span>Kader</span><b class="mono" id="heroSquad">–</b></div>
-      </div>
-      <div class="hero-sub" id="heroSub"></div>
+<!-- APP -->
+<div class="shell" id="screen-main" hidden>
+  <aside class="side">
+    <div class="wordmark">
+      <svg class="logo" width="26" height="26" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="7" class="logo-bg"></rect><rect x="6" y="17" width="16" height="3" rx="1.5" class="logo-track"></rect><rect x="6" y="17" width="10" height="3" rx="1.5" class="logo-acc"></rect><rect x="6" y="9" width="3" height="5" rx="1.5" class="logo-fg"></rect><rect x="11" y="7" width="3" height="7" rx="1.5" class="logo-fg"></rect><rect x="16" y="10" width="3" height="4" rx="1.5" class="logo-fg"></rect></svg>
+      <span>Kaderplaner</span>
     </div>
-    <div id="alerts"></div>
-
-    <main id="body"><div class="spinner"></div></main>
-
-    <nav class="nav" id="nav">
-      <button data-tab="kader" class="on">Kader</button>
+    <nav class="side-group" aria-label="Ligen">
+      <div class="side-label">Ligen</div>
+      <div id="sideLeagues"></div>
+    </nav>
+    <nav class="side-group" aria-label="Ansicht" id="sideNav">
+      <div class="side-label">Ansicht</div>
+      <button data-tab="overview">Übersicht</button>
+      <button data-tab="kader">Kader</button>
       <button data-tab="markt">Markt</button>
       <button data-tab="gegner">Gegner</button>
     </nav>
-  </section>
+    <div class="side-foot">
+      <span id="sideUser"></span>
+      <button class="text-btn" id="sideLogout" type="button">Abmelden</button>
+    </div>
+  </aside>
 
-  <!-- SHEET (Ligawahl, Menü) -->
-  <div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
-  <div class="sheet" id="sheet" hidden></div>
+  <div class="content">
+    <header class="top">
+      <button class="league-btn" id="leagueBtn" type="button">
+        <span id="leagueName">Liga</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+      </button>
+      <div class="page-title">
+        <h1 id="pageTitle">Liga</h1>
+        <div class="page-sub num" id="pageSub"></div>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn" id="refreshBtn" type="button" aria-label="Aktualisieren">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"></path><path d="M21 4v5h-5"></path></svg>
+          <span class="desk-only">Aktualisieren</span>
+        </button>
+        <button class="icon-btn mobile-only" id="menuBtn" type="button" aria-label="Konto">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>
+        </button>
+      </div>
+    </header>
+
+    <section class="summary num" id="summary">
+      <div class="sum-main">
+        <div class="lbl">Kontostand</div>
+        <div class="big" id="sumBudget">–</div>
+      </div>
+      <div class="sum-stat">
+        <div class="lbl">Nach Plan</div>
+        <div class="val" id="sumAfter">–</div>
+        <div class="cap desk-only" id="sumAfterCap"></div>
+      </div>
+      <div class="sum-stat">
+        <div class="lbl">Spielraum</div>
+        <div class="val acc" id="sumRoom">–</div>
+        <div class="meter desk-only"><i class="meter-fill"></i></div>
+        <div class="cap desk-only" id="sumRoomCap"></div>
+      </div>
+      <div class="sum-stat">
+        <div class="lbl">Kader</div>
+        <div class="val" id="sumSquad">–</div>
+        <div class="cap desk-only" id="sumSquadCap"></div>
+      </div>
+    </section>
+    <div class="meter-row mobile-only num">
+      <div class="meter"><i class="meter-fill"></i></div>
+      <div class="meter-cap"><span id="meterLeft"></span><span id="meterRight"></span></div>
+    </div>
+    <div class="alerts" id="alerts"></div>
+
+    <main id="body"><div class="spinner"></div></main>
+  </div>
+
+  <nav class="tabbar" id="tabbar" aria-label="Ansicht">
+    <button data-tab="kader">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"></path><circle cx="9.5" cy="7" r="4"></circle><path d="M21 21v-2a4 4 0 0 0-3-3.87"></path></svg>
+      Kader
+    </button>
+    <button data-tab="markt">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h13l-3-3"></path><path d="M17 17H4l3 3"></path></svg>
+      Markt
+    </button>
+    <button data-tab="gegner">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10"></path><path d="M10 20V4"></path><path d="M16 20v-7"></path><path d="M22 20H2"></path></svg>
+      Gegner
+    </button>
+  </nav>
 </div>
+
+<!-- SHEET (Ligawahl, Konto) -->
+<div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
+<div class="sheet" id="sheet" hidden></div>
+
 <script>
 
 </script>
@@ -747,20 +896,24 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
 (function(){
   "use strict";
 
-  var IMG_BASE = "https://kickbase.b-cdn.net/";
   var POS_MAP = {1:"TW", 2:"ABW", 3:"MF", 4:"ANG"};
   var POS_ORDER = ["TW","ABW","MF","ANG"];
   var POS_LABEL = {TW:"Torwart", ABW:"Abwehr", MF:"Mittelfeld", ANG:"Angriff"};
   var URGENT_SEC = 1800;
+  var DESKTOP = window.matchMedia ? window.matchMedia('(min-width: 1000px)') : { matches: false };
 
   var C = window.KBCalc;
   var $ = function(id){ return document.getElementById(id); };
   var els = {
     setup: $('screen-setup'), main: $('screen-main'),
     tokenInput: $('tokenInput'), connectBtn: $('connectBtn'), setupStatus: $('setupStatus'),
-    leagueBtn: $('leagueBtn'), leagueName: $('leagueName'), refreshBtn: $('refreshBtn'), menuBtn: $('menuBtn'),
-    hero: $('hero'), heroBudget: $('heroBudget'), heroAfter: $('heroAfter'), heroRoom: $('heroRoom'),
-    heroSquad: $('heroSquad'), heroSub: $('heroSub'), alerts: $('alerts'), body: $('body'), nav: $('nav'),
+    leagueBtn: $('leagueBtn'), leagueName: $('leagueName'), pageTitle: $('pageTitle'), pageSub: $('pageSub'),
+    refreshBtn: $('refreshBtn'), menuBtn: $('menuBtn'),
+    sideLeagues: $('sideLeagues'), sideNav: $('sideNav'), sideUser: $('sideUser'), sideLogout: $('sideLogout'),
+    sumBudget: $('sumBudget'), sumAfter: $('sumAfter'), sumAfterCap: $('sumAfterCap'),
+    sumRoom: $('sumRoom'), sumRoomCap: $('sumRoomCap'), sumSquad: $('sumSquad'), sumSquadCap: $('sumSquadCap'),
+    meterLeft: $('meterLeft'), meterRight: $('meterRight'),
+    alerts: $('alerts'), body: $('body'), tabbar: $('tabbar'),
     sheet: $('sheet'), sheetBackdrop: $('sheetBackdrop')
   };
 
@@ -776,20 +929,20 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
     return (n < 0 ? '−' : '') + s;
   }
   function delta(n){ n = n || 0; return (n >= 0 ? '+' : '−') + short(Math.abs(n)); }
-  function cls(n){ return (n || 0) >= 0 ? 'up' : 'dn'; }
+  function negCls(n){ return (n || 0) < 0 ? ' neg' : ''; }
   function escapeHtml(s){
     return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
       return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
     });
   }
-  function img(path){ return path ? IMG_BASE + path : ""; }
   function countdown(sec){
-    if (sec == null) return "kein Zeitlimit";
+    if (sec == null) return "ohne Frist";
     if (sec <= 0) return "läuft ab";
     var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60);
-    return h ? h + " Std " + m + " Min" : m + " Min";
+    return h ? h + " Std " + m + " Min" : "noch " + m + " Min";
   }
   var dateFmt = new Intl.DateTimeFormat('de-DE', {weekday:'short', hour:'2-digit', minute:'2-digit'});
+  function each(sel, fn){ Array.prototype.forEach.call(document.querySelectorAll(sel), fn); }
 
   // ---------- Token und Liga: Keychain (Scriptable) oder localStorage ----------
   // In Scriptable melden kaderplaner://-Links Aenderungen an den Wrapper. Die
@@ -854,11 +1007,11 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
   // ---------- State ----------
   function initialState(){
     return {
-      token:null, tokenName:"", myUserId:null, myImg:"", leagues:[], league:null,
+      token:null, tokenName:"", myUserId:null, leagues:[], league:null,
       budget:0, players:[], sell:{}, market:[], bids:{},
-      managers:[], overview:null, clubNames:{}, nextKickoff:null,
-      estimates:null, estLoading:false, estError:false, estProgress:"",
-      openManager:null, managerSquads:{}, tab:'kader', loading:false
+      managers:[], overview:null, clubNames:{}, nextKickoff:null, matchday:null,
+      estimates:null, estLoading:false, estError:false, estProgress:"", showCalc:false,
+      openManager:null, managerSquads:{}, tab:null, loading:false
     };
   }
   var state = initialState();
@@ -872,9 +1025,9 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
   function applyToken(raw, silent){
     var token = cleanToken(raw);
     var payload = decodeToken(token);
-    var fail = function(msg){ if (!silent) els.setupStatus.innerHTML = '<div class="status-msg">' + msg + '</div>'; return false; };
+    var fail = function(msg){ if (!silent) els.setupStatus.innerHTML = '<p class="status-msg">' + msg + '</p>'; return false; };
     if (!payload) return fail("Der Token sieht nicht gültig aus. Bitte den Wert aus <code>kb.t</code> komplett neu kopieren.");
-    if (payload.exp && Date.now() / 1000 > payload.exp) return fail("Dieser Token ist abgelaufen. Bitte neu bei play.kickbase.com einloggen und den frischen Token einfügen.");
+    if (payload.exp && Date.now() / 1000 > payload.exp) return fail("Dieser Token ist abgelaufen. Bitte neu anmelden.");
     state.token = token;
     state.tokenName = payload["kb.name"] || "";
     state.myUserId = payload["kb.uid"] != null ? String(payload["kb.uid"]) : null;
@@ -916,14 +1069,14 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
       var msg = err.message === "credentials" ? "E-Mail oder Passwort stimmt nicht."
         : err.message === "token" ? "Kickbase hat keinen gültigen Token geliefert. Versuch es mit dem Token-Weg darunter."
         : "Kickbase ist gerade nicht erreichbar. Prüf dein Netz und versuch es nochmal.";
-      if (!els.setupStatus.innerHTML) els.setupStatus.innerHTML = '<div class="status-msg">' + msg + '</div>';
+      if (!els.setupStatus.innerHTML) els.setupStatus.innerHTML = '<p class="status-msg">' + msg + '</p>';
     }).then(function(){ btn.disabled = false; btn.textContent = "Anmelden"; });
   });
 
   els.connectBtn.addEventListener('click', function(){
     els.setupStatus.innerHTML = "";
     if (!els.tokenInput.value.trim()){
-      els.setupStatus.innerHTML = '<div class="status-msg">Bitte zuerst den Token einfügen.</div>';
+      els.setupStatus.innerHTML = '<p class="status-msg">Bitte zuerst den Token einfügen.</p>';
       return;
     }
     if (applyToken(els.tokenInput.value, false)){
@@ -939,15 +1092,16 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
     closeSheet();
     show('setup');
   }
+  els.sideLogout.addEventListener('click', logout);
 
   // ---------- Fehler ----------
   function showError(err, retry){
     if (err && err.auth){
-      els.body.innerHTML = '<div class="empty">Kickbase hat den Token abgelehnt, vermutlich ist er abgelaufen.<br><button class="link-btn" id="reAuth">Neuen Token eingeben</button></div>';
+      els.body.innerHTML = '<div class="empty">Kickbase hat die Anmeldung abgelehnt, vermutlich ist sie abgelaufen.<br><button class="text-btn" id="reAuth">Neu anmelden</button></div>';
       $('reAuth').addEventListener('click', logout);
       return;
     }
-    els.body.innerHTML = '<div class="empty">Verbindung zu Kickbase hat nicht geklappt.<br><button class="link-btn" id="retry">Erneut versuchen</button></div>';
+    els.body.innerHTML = '<div class="empty">Verbindung zu Kickbase hat nicht geklappt.<br><button class="text-btn" id="retry">Erneut versuchen</button></div>';
     $('retry').addEventListener('click', retry);
   }
 
@@ -959,21 +1113,35 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
       state.leagues = (d && d.it) || [];
       if (!state.leagues.length){ els.body.innerHTML = '<div class="empty">Keine Ligen gefunden.</div>'; return; }
       var last = readLeague();
-      var l =state.leagues.filter(function(x){ return String(x.i) === last; })[0] || state.leagues[0];
+      var l = state.leagues.filter(function(x){ return String(x.i) === last; })[0] || state.leagues[0];
       openLeague(l);
     }).catch(function(err){ showError(err, loadLeagues); });
   }
 
+  function cpiLabel(cpi){ return ({"1": "1. BL", "2": "2. BL", "3": "La Liga"})[String(cpi)] || ""; }
+
+  function renderSide(){
+    els.sideLeagues.innerHTML = state.leagues.map(function(l, i){
+      var on = state.league && String(state.league.i) === String(l.i);
+      return '<button type="button" class="' + (on ? 'on' : '') + '" data-league="' + i + '">' + escapeHtml(l.n || 'Liga') + '<span>' + cpiLabel(l.cpi) + '</span></button>';
+    }).join('');
+    each('#sideLeagues [data-league]', function(b){
+      b.addEventListener('click', function(){ openLeague(state.leagues[+b.getAttribute('data-league')]); });
+    });
+    els.sideUser.textContent = state.tokenName ? 'Angemeldet als ' + state.tokenName : '';
+  }
+
   function openLeague(l){
-    var keepTab = state.tab;
-    var keep = {token: state.token, tokenName: state.tokenName, myUserId: state.myUserId, leagues: state.leagues};
+    var keep = {token: state.token, tokenName: state.tokenName, myUserId: state.myUserId, leagues: state.leagues, tab: state.tab};
     state = initialState();
     Object.keys(keep).forEach(function(k){ state[k] = keep[k]; });
     state.league = l;
-    state.tab = keepTab;
     persistLeague(l.i);
     els.leagueName.textContent = l.n || "Liga";
-    setTab(state.tab, true);
+    els.pageTitle.textContent = l.n || "Liga";
+    els.pageSub.textContent = "";
+    renderSide();
+    markTabs();
     loadLeague();
   }
 
@@ -998,6 +1166,7 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
       var me = r[0], squad = r[1], market = r[2], ranking = r[3], ov = r[4], table = r[5], perf = r[6];
       state.budget = me.b || 0;
       state.overview = ov || {mppu: me.mppu, mpst: me.mpst, mgc: me.mgc, cpi: cpi};
+      state.matchday = ranking && ranking.day || null;
       var names = {};
       ((table && table.it) || []).forEach(function(t){ if (t.tid) names[t.tid] = t.tn; });
       state.clubNames = names;
@@ -1006,7 +1175,7 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
         return {
           id: String(p.i || p.pi), name: p.n || p.pn || "Unbekannt", pos: POS_MAP[p.pos] || "–",
           mv: p.mv || 0, gain: p.mvgl, day: p.tfhmvt, ap: p.ap, status: p.st || 0,
-          offers: p.ofc || 0, tid: p.tid, img: img(p.pim)
+          offers: p.ofc || 0, tid: p.tid
         };
       });
 
@@ -1015,17 +1184,14 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
           id: String(p.i), name: (p.fn ? p.fn.charAt(0) + ". " : "") + (p.n || "Unbekannt"),
           pos: POS_MAP[p.pos] || "–", mv: p.mv || 0, price: p.prc != null ? p.prc : (p.mv || 0),
           expires: p.exs != null ? p.exs : null, loadedAt: Date.now(), status: p.st || 0,
-          bids: p.ofc || 0, by: p.u ? (p.u.n || "Manager") : null, byId: p.u ? String(p.u.i) : null,
-          tid: p.tid, ap: p.ap, img: img(p.pim)
+          bids: p.ofc || 0, by: p.u ? (p.u.n || "Manager") : null, tid: p.tid, ap: p.ap
         };
       });
 
       state.managers = ((ranking && ranking.us) || []).map(function(u){
         var isMe = state.myUserId && String(u.i) === state.myUserId;
-        if (isMe) state.myImg = img(u.uim);
-        return { id: String(u.i), name: u.n || "Manager", isMe: isMe, points: u.sp || 0, img: img(u.uim) };
+        return { id: String(u.i), name: u.n || "Manager", isMe: isMe, points: u.sp || 0 };
       });
-      els.menuBtn.style.backgroundImage = state.myImg ? 'url("' + state.myImg + '")' : '';
 
       state.nextKickoff = null;
       var season = perf && perf.it && perf.it[0];
@@ -1033,6 +1199,11 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
         var t = d.md ? Date.parse(d.md) : null;
         if (t && t > Date.now() && (state.nextKickoff == null || t < state.nextKickoff)) state.nextKickoff = t;
       });
+
+      var sub = [cpiLabel(cpi).replace('BL', 'Bundesliga')];
+      if (state.matchday) sub.push('Spieltag ' + state.matchday);
+      if (state.nextKickoff) sub.push('Anpfiff ' + dateFmt.format(new Date(state.nextKickoff)));
+      els.pageSub.textContent = sub.filter(Boolean).join(' · ');
 
       state.loading = false;
       els.refreshBtn.classList.remove('spin');
@@ -1050,28 +1221,44 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
     loadLeague();
   });
 
-  // ---------- Tabs ----------
-  function setTab(tab, silent){
-    state.tab = tab;
-    Array.prototype.forEach.call(els.nav.querySelectorAll('button'), function(b){
-      b.className = b.getAttribute('data-tab') === tab ? 'on' : '';
-    });
-    if (!silent){ render(); window.scrollTo(0, 0); }
+  // ---------- Ansichten ----------
+  // Desktop zeigt standardmaessig die Uebersicht (Kader, Markt, Bietkraft
+  // nebeneinander), das Handy einzelne Tabs.
+  function currentTab(){
+    var t = state.tab || (DESKTOP.matches ? 'overview' : 'kader');
+    if (t === 'overview' && !DESKTOP.matches) t = 'kader';
+    return t;
   }
-  els.nav.addEventListener('click', function(e){
-    var t = e.target.getAttribute && e.target.getAttribute('data-tab');
-    if (t) setTab(t);
+  function markTabs(){
+    var t = currentTab();
+    each('[data-tab]', function(b){ b.classList.toggle('on', b.getAttribute('data-tab') === t); });
+  }
+  function setTab(tab){
+    state.tab = tab;
+    markTabs();
+    render();
+    window.scrollTo(0, 0);
+  }
+  each('[data-tab]', function(b){
+    b.addEventListener('click', function(){ setTab(b.getAttribute('data-tab')); });
   });
+  if (DESKTOP.addEventListener) DESKTOP.addEventListener('change', function(){ markTabs(); render(); });
 
   function render(){
     if (!state.league || state.loading && !state.players.length) return;
-    renderHero();
-    if (state.tab === 'kader') renderSquad();
-    else if (state.tab === 'markt') renderMarket();
-    else renderManagers();
+    renderSummary();
+    var t = currentTab();
+    if ((t === 'gegner' || t === 'overview') && !state.estimates && !state.estLoading && !state.estError) loadEstimates();
+    var html;
+    if (t === 'overview') html = '<div class="cols">' + squadPanel(true) + marketPanel(true) + managersPanel(true) + '</div>';
+    else if (t === 'markt') html = marketPanel(false);
+    else if (t === 'gegner') html = managersPanel(false);
+    else html = squadPanel(false);
+    els.body.innerHTML = html;
+    bindBody();
   }
 
-  // ---------- Planung (Kopfbereich) ----------
+  // ---------- Kennzahlen ----------
   function plan(){
     var sold = 0, keptValue = 0, kept = [];
     state.players.forEach(function(p){
@@ -1089,25 +1276,38 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
     };
   }
 
-  function renderHero(){
-    var p = plan(), limit = state.overview && state.overview.mppu;
-    els.heroBudget.textContent = fmtMoney(state.budget);
-    els.heroAfter.textContent = short(p.after);
-    els.heroRoom.textContent = short(p.room.headroom);
-    els.heroSquad.textContent = p.squadSize + (limit ? "/" + limit : "");
-    els.hero.className = 'hero' + (p.room.headroom < 0 ? ' neg' : '');
-    var sub = [];
-    if (p.sold || p.bids) sub.push((p.sold ? 'Verkauf +' + short(p.sold) : '') + (p.sold && p.bids ? ' · ' : '') + (p.bids ? 'Gebote ' + short(p.bids) : ''));
-    sub.push('Minus-Grenze ' + short(p.room.maxNegative));
-    if (state.nextKickoff) sub.push('Anpfiff ' + dateFmt.format(new Date(state.nextKickoff)));
-    els.heroSub.textContent = sub.join(' · ');
+  function renderSummary(){
+    var p = plan(), limit = state.overview && state.overview.mppu, clubLimit = state.overview && state.overview.mpst;
+    els.sumBudget.textContent = fmtMoney(state.budget);
+    els.sumBudget.className = 'big' + negCls(state.budget);
+    els.sumAfter.textContent = short(p.after);
+    els.sumAfter.className = 'val' + negCls(p.after);
+    els.sumRoom.textContent = short(p.room.headroom);
+    els.sumRoom.className = 'val ' + (p.room.headroom < 0 ? 'neg' : 'acc');
+    els.sumSquad.textContent = p.squadSize + (limit ? ' / ' + limit : '');
+
+    var planned = [];
+    if (p.sold) planned.push('Verkauf +' + short(p.sold));
+    if (p.bids) planned.push('Gebote ' + short(p.bids));
+    els.sumAfterCap.textContent = planned.join(' · ') || 'nichts eingeplant';
+    els.sumRoomCap.textContent = 'Grenze ' + short(p.room.maxNegative);
+    els.sumSquadCap.textContent = clubLimit ? 'max. ' + clubLimit + ' pro Verein' : '';
+    els.meterLeft.textContent = planned.length ? planned.join(' · ') + ' eingeplant' : 'Spielraum bis zur Minus-Grenze';
+    els.meterRight.textContent = 'Grenze ' + short(p.room.maxNegative);
+
+    // Balken: Anteil des Spielraums an der gesamten Bietkapazitaet
+    var capacity = p.room.headroom + p.bids;
+    var share = capacity > 0 ? Math.max(0, Math.min(1, p.room.headroom / capacity)) : 0;
+    each('.meter-fill', function(f){
+      f.style.width = (p.room.headroom < 0 ? 100 : Math.round(share * 100)) + '%';
+      f.classList.toggle('neg', p.room.headroom < 0);
+    });
 
     var alerts = [];
     if (p.room.headroom < 0) alerts.push(['', 'Über der 33%-Grenze um ' + short(-p.room.headroom) + '. Kickbase lehnt weitere Gebote ab.']);
-    if (p.after < 0) alerts.push(['warn', 'Kontostand nach Plan im Minus. Steht er bei Anpfiff unter null, gibt es 0 Punkte für den Spieltag.']);
+    if (p.after < 0) alerts.push(['soft', 'Nach Plan im Minus. Steht der Kontostand bei Anpfiff unter null, gibt es 0 Punkte für den Spieltag.']);
     if (limit && p.squadSize > limit) alerts.push(['', 'Kaderlimit ' + limit + ' überschritten (' + p.squadSize + ' Spieler).']);
-    if (p.squadSize < 11) alerts.push(['warn', 'Nur ' + p.squadSize + ' Spieler. Jeder leere Aufstellungsplatz kostet 100 Punkte.']);
-    var clubLimit = state.overview && state.overview.mpst;
+    if (p.squadSize < 11) alerts.push(['soft', 'Nur ' + p.squadSize + ' Spieler. Jeder leere Aufstellungsplatz kostet 100 Punkte.']);
     if (clubLimit){
       var byClub = {};
       p.kept.concat(p.bought).forEach(function(x){ if (x.tid) byClub[x.tid] = (byClub[x.tid] || 0) + 1; });
@@ -1115,43 +1315,41 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
         if (byClub[tid] > clubLimit) alerts.push(['', (state.clubNames[tid] || 'Verein ' + tid) + ': ' + byClub[tid] + ' Spieler, erlaubt sind ' + clubLimit + '.']);
       });
     }
-    els.alerts.innerHTML = alerts.map(function(a){ return '<div class="alert ' + a[0] + '">' + escapeHtml(a[1]) + '</div>'; }).join('');
-  }
-
-  function photo(p){
-    return '<div class="ph"' + (p.img ? ' style="background-image:url(\'' + p.img + '\')"' : '') + '><i>' + p.pos + '</i></div>';
+    els.alerts.innerHTML = alerts.map(function(a){ return '<p class="alert ' + a[0] + '">' + escapeHtml(a[1]) + '</p>'; }).join('');
   }
 
   // ---------- Kader ----------
-  function renderSquad(){
-    if (!state.players.length){ els.body.innerHTML = '<div class="empty">Keine Spieler im Kader.</div>'; return; }
-    var html = "";
+  function squadRow(p, compact){
+    var sold = !!state.sell[p.id];
+    var sub = [];
+    if (p.gain != null) sub.push('<span class="' + negCls(p.gain).trim() + '">' + delta(p.gain) + ' seit Kauf</span>');
+    if (p.ap != null) sub.push('Ø ' + p.ap);
+    if (p.offers) sub.push(p.offers + ' Angebot' + (p.offers > 1 ? 'e' : ''));
+    return '<div class="row' + (sold ? ' on sold' : '') + '">' +
+      (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
+      '<div class="main"><div class="name">' + escapeHtml(p.name) + (p.status ? '<span class="dot" title="Status beachten"></span>' : '') + '</div>' +
+        '<div class="sub num">' + sub.join(' · ') + '</div></div>' +
+      '<div class="fig num"><div class="v">' + short(p.mv) + '</div>' + (p.day != null ? '<div class="d' + negCls(p.day) + '">' + delta(p.day) + '</div>' : '') + '</div>' +
+      '<button type="button" class="btn' + (sold ? ' on' : '') + '" data-sell="' + p.id + '">' + (sold ? 'Verkauft' : 'Verkaufen') + '</button>' +
+    '</div>';
+  }
+
+  function squadPanel(compact){
+    var total = state.players.reduce(function(s, p){ return s + p.mv; }, 0);
+    var html = '<section class="panel"><div class="panel-head"><h2>Kader</h2><span class="num">' +
+      (compact ? short(total) : (state.nextKickoff ? 'Anpfiff ' + dateFmt.format(new Date(state.nextKickoff)) : short(total))) + '</span></div>';
+    if (!state.players.length) return html + '<div class="empty">Keine Spieler im Kader.</div></section>';
     POS_ORDER.concat(["–"]).forEach(function(pos){
       var list = state.players.filter(function(p){ return p.pos === pos; });
       if (!list.length) return;
       list.sort(function(a, b){ return b.mv - a.mv; });
-      var value = list.reduce(function(s, p){ return s + p.mv; }, 0);
-      html += '<div class="ttl"><b>' + (POS_LABEL[pos] || 'Weitere') + '</b><span>' + list.length + ' Spieler · ' + short(value) + '</span></div>';
-      list.forEach(function(p){
-        var sold = !!state.sell[p.id];
-        var meta = [];
-        if (p.gain != null) meta.push('<span class="' + cls(p.gain) + '">' + delta(p.gain) + ' seit Kauf</span>');
-        if (p.ap != null) meta.push('<span>Ø ' + p.ap + ' P</span>');
-        if (p.offers) meta.push('<span class="tag hot">' + p.offers + ' Angebot' + (p.offers > 1 ? 'e' : '') + '</span>');
-        html += '<div class="card' + (sold ? ' sold' : '') + '">' + photo(p) +
-          '<div class="mid"><div class="n">' + escapeHtml(p.name) + (p.status ? ' <span class="dot" title="Status beachten"></span>' : '') + '</div><div class="m">' + meta.join('') + '</div></div>' +
-          '<div class="rt"><b class="mono">' + short(p.mv) + '</b>' + (p.day != null ? '<small class="mono ' + cls(p.day) + '">' + delta(p.day) + '</small>' : '') + '</div>' +
-          '<button class="act' + (sold ? ' sell' : '') + '" data-sell="' + p.id + '">' + (sold ? 'Verkauft' : 'Verkaufen') + '</button></div>';
-      });
+      if (!compact){
+        var value = list.reduce(function(s, p){ return s + p.mv; }, 0);
+        html += '<div class="group num"><span>' + (POS_LABEL[pos] || 'Weitere') + '</span><span>' + list.length + ' · ' + short(value) + '</span></div>';
+      }
+      list.forEach(function(p){ html += squadRow(p, compact); });
     });
-    els.body.innerHTML = html;
-    Array.prototype.forEach.call(els.body.querySelectorAll('[data-sell]'), function(b){
-      b.addEventListener('click', function(){
-        var id = b.getAttribute('data-sell');
-        if (state.sell[id]) delete state.sell[id]; else state.sell[id] = true;
-        render();
-      });
-    });
+    return html + '</section>';
   }
 
   // ---------- Markt ----------
@@ -1159,63 +1357,46 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
     return p.expires == null ? null : p.expires - Math.round((Date.now() - p.loadedAt) / 1000);
   }
 
-  function renderMarket(){
-    if (!state.market.length){ els.body.innerHTML = '<div class="empty">Gerade steht niemand auf dem Transfermarkt.</div>'; return; }
+  function marketRow(p, compact){
+    var marked = state.bids[p.id] != null;
+    var left = remaining(p), sub = [];
+    if (p.by){
+      var pct = p.mv ? Math.round((p.price / p.mv - 1) * 100) : 0;
+      sub.push(escapeHtml(p.by));
+      sub.push('<span class="' + (pct > 10 ? 'neg' : '') + '">' + (pct >= 0 ? '+' : '') + pct + ' % zum MW</span>');
+    } else {
+      sub.push('<span class="' + (left != null && left < URGENT_SEC ? 'urgent' : '') + '">' + countdown(left) + '</span>');
+      if (state.nextKickoff && left != null && Date.now() + left * 1000 > state.nextKickoff) sub.push('nach Anpfiff');
+    }
+    if (p.bids) sub.push(p.bids + ' Gebot' + (p.bids > 1 ? 'e' : ''));
+    if (!compact && state.clubNames[p.tid]) sub.push(escapeHtml(state.clubNames[p.tid]));
+    var html = '<div class="row' + (marked ? ' on' : '') + '">' +
+      (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
+      '<div class="main"><div class="name">' + escapeHtml(p.name) + (p.status ? '<span class="dot" title="Status beachten"></span>' : '') + '</div>' +
+        '<div class="sub num">' + sub.join(' · ') + '</div></div>' +
+      '<div class="fig num"><div class="v">' + short(p.price) + '</div></div>' +
+      '<button type="button" class="btn' + (marked ? ' on' : '') + '" data-buy="' + p.id + '">' + (marked ? 'Gemerkt' : 'Bieten') + '</button>' +
+    '</div>';
+    if (marked){
+      var over = p.mv ? Math.round((state.bids[p.id] / p.mv - 1) * 100) : 0;
+      html += '<label class="bidrow num">Dein Gebot <input data-bid="' + p.id + '" inputmode="numeric" value="' + state.bids[p.id].toLocaleString('de-DE') + '"> € · ' + (over >= 0 ? '+' : '') + over + ' %</label>';
+    }
+    return html;
+  }
+
+  function marketPanel(compact){
+    var html = '<section class="panel"><div class="panel-head"><h2>Markt</h2><span>läuft zuerst ab</span></div>';
+    if (!state.market.length) return html + '<div class="empty">Gerade steht niemand auf dem Transfermarkt.</div></section>';
     var free = state.market.filter(function(p){ return !p.by; });
     var offers = state.market.filter(function(p){ return p.by; });
     free.sort(function(a, b){ return (a.expires || 0) - (b.expires || 0); });
     offers.sort(function(a, b){ return (a.price / a.mv) - (b.price / b.mv); });
-    var html = '';
-    if (free.length){
-      html += '<div class="ttl"><b>Transfermarkt</b><span>läuft zuerst ab</span></div>';
-      free.forEach(function(p){ html += marketCard(p); });
-    }
+    free.forEach(function(p){ html += marketRow(p, compact); });
     if (offers.length){
-      html += '<div class="ttl"><b>Von Managern</b><span>Forderung, oft verhandelbar</span></div>';
-      offers.forEach(function(p){ html += marketCard(p); });
+      html += '<div class="subhead"><h3>Von Managern</h3><span>ohne Frist, oft verhandelbar</span></div>';
+      offers.forEach(function(p){ html += marketRow(p, compact); });
     }
-    els.body.innerHTML = html;
-    Array.prototype.forEach.call(els.body.querySelectorAll('[data-buy]'), function(b){
-      b.addEventListener('click', function(){
-        var id = b.getAttribute('data-buy');
-        var p = state.market.filter(function(x){ return x.id === id; })[0];
-        if (state.bids[id] != null) delete state.bids[id]; else state.bids[id] = p.price;
-        render();
-      });
-    });
-    Array.prototype.forEach.call(els.body.querySelectorAll('[data-bid]'), function(inp){
-      inp.addEventListener('change', function(){
-        var v = parseInt(inp.value.replace(/[^0-9]/g, ''), 10);
-        if (!isNaN(v)) state.bids[inp.getAttribute('data-bid')] = v;
-        renderHero();
-        inp.value = (state.bids[inp.getAttribute('data-bid')] || 0).toLocaleString('de-DE');
-      });
-    });
-  }
-
-  function marketCard(p){
-    var marked = state.bids[p.id] != null;
-    var left = remaining(p);
-    var meta = [];
-    if (p.by){
-      var pct = p.mv ? Math.round((p.price / p.mv - 1) * 100) : 0;
-      meta.push('<span>' + escapeHtml(p.by) + '</span>');
-      meta.push('<span class="tag' + (pct > 10 ? ' bad' : '') + '">' + (pct >= 0 ? '+' : '') + pct + ' % zum MW</span>');
-    } else {
-      meta.push('<span class="tag' + (left != null && left < URGENT_SEC ? ' hot' : '') + '">' + countdown(left) + '</span>');
-      if (state.nextKickoff && left != null && Date.now() + left * 1000 > state.nextKickoff) meta.push('<span class="tag bad">nach Anpfiff</span>');
-    }
-    if (p.bids) meta.push('<span class="tag">' + p.bids + ' Gebot' + (p.bids > 1 ? 'e' : '') + '</span>');
-    if (p.ap != null) meta.push('<span>Ø ' + p.ap + ' P</span>');
-    var club = state.clubNames[p.tid];
-    var html = '<div class="card' + (marked ? ' bought open' : '') + '">' + photo(p) +
-      '<div class="mid"><div class="n">' + escapeHtml(p.name) + (p.status ? ' <span class="dot" title="Status beachten"></span>' : '') + '</div><div class="m">' + meta.join('') + '</div></div>' +
-      '<div class="rt"><b class="mono">' + short(p.price) + '</b>' + (club ? '<small style="color:var(--mut)">' + escapeHtml(club) + '</small>' : '') + '</div>' +
-      '<button class="act' + (marked ? ' buy' : '') + '" data-buy="' + p.id + '">' + (marked ? 'Vorgemerkt' : 'Bieten') + '</button></div>';
-    if (marked){
-      html += '<div class="bid">Gebot <input data-bid="' + p.id + '" inputmode="numeric" value="' + state.bids[p.id].toLocaleString('de-DE') + '"> €</div>';
-    }
-    return html;
+    return html + '</section>';
   }
 
   // ---------- Gegner ----------
@@ -1236,12 +1417,12 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
     }).then(function(res){
       if (state.league !== l) return;
       state.estimates = res; state.estLoading = false;
-      if (state.tab === 'gegner') render();
+      render();
     }).catch(function(err){
       if (state.league !== l) return;
       state.estLoading = false; state.estError = true;
       if (err && err.auth) return showError(err, loadEstimates);
-      if (state.tab === 'gegner') render();
+      render();
     });
   }
 
@@ -1259,58 +1440,56 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
     });
   }
 
-  function renderManagers(){
-    if (!state.estimates && !state.estLoading && !state.estError) loadEstimates();
+  function managersPanel(compact){
     var est = state.estimates;
-    var html = '<details class="info"><summary>So wird gerechnet</summary>' +
-      '<p>Kickbase verrät die Kontostände der anderen nicht. Die App rechnet sie nach: Startbudget, alle Käufe und Verkäufe seit Ligastart, MVP-Auto-Verkäufe, ' +
-      fmtMoney(est ? est.pointValue : 1000) + ' je Saisonpunkt, Erfolgsprämien (Spieltagssiege, Punkteschwellen, starke Spieler, Transfers, Gewinne) und die tägliche Auflaufprämie.</p>' +
-      '<p>Unsicher ist vor allem die Auflaufprämie. Daher die Spanne: oben bei täglichem Login, unten nur an Tagen mit Transfers.</p>' +
-      '<p><b>Bietkraft</b> = Kontostand plus Spielraum bis zur 33%-Grenze. Wer keinen Kaderplatz frei hat, kann nicht mitbieten.</p>';
-    if (est && est.check){
-      var off = Math.abs(est.check.diff);
-      html += '<p class="check' + (off > 1e6 ? ' bad' : '') + '">Gegenprobe an deinem Konto: gerechnet ' + fmtMoney(est.check.estimate) + ', echt ' + fmtMoney(est.check.real) + ' (Abweichung ' + short(off) + ').</p>';
-    }
-    html += '</details>';
+    var html = '<section class="panel"><div class="panel-head"><h2>' + (compact ? 'Bietkraft' : 'Wer kann mitbieten?') + '</h2>' +
+      '<span>' + (compact && est && est.check ? 'Gegenprobe: ' + short(Math.abs(est.check.diff)) : '') + '</span></div>';
+    if (!compact) html += '<p class="panel-intro">Geschätzter Kontostand plus Spielraum bis zur 33%-Grenze. Ohne freien Kaderplatz kein Gebot.</p>';
 
     if (!est){
       html += state.estError
-        ? '<div class="empty">Die Kontostände konnten nicht berechnet werden.<br><button class="link-btn" id="estRetry">Erneut versuchen</button></div>'
+        ? '<div class="empty">Die Kontostände konnten nicht berechnet werden.<br><button class="text-btn" id="estRetry">Erneut versuchen</button></div>'
         : '<div class="spinner"></div><div class="progress" id="estProgress">' + escapeHtml(state.estProgress || 'Lade Transfers und Spieltage …') + '</div>';
-      els.body.innerHTML = html;
-      var r = $('estRetry');
-      if (r) r.addEventListener('click', function(){ state.estError = false; render(); });
-      return;
+      return html + '</section>';
+    }
+
+    if (!compact && est.check){
+      var off = Math.abs(est.check.diff);
+      html += '<div class="check' + (off > 1e6 ? ' bad' : '') + '"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        (off > 1e6 ? '<path d="M12 8v5"></path><path d="M12 16h.01"></path>' : '<path d="M20 6 9 17l-5-5"></path>') + '</svg>' +
+        '<span>Gegenprobe an deinem Konto: ' + short(off) + ' Abweichung</span>' +
+        '<button type="button" class="text-btn" id="calcBtn">' + (state.showCalc ? 'Weniger' : 'Rechnung') + '</button></div>';
+      if (state.showCalc){
+        html += '<div class="calc"><p>Kickbase zeigt die Kontostände der anderen nicht. Gerechnet wird: Startbudget, alle Käufe und Verkäufe seit Ligastart, MVP-Auto-Verkäufe, ' +
+          fmtMoney(est.pointValue) + ' je Saisonpunkt, Erfolgsprämien (Spieltagssiege, Punkteschwellen, starke Spieler, Transfers, Gewinne) und die tägliche Auflaufprämie.</p>' +
+          '<p>Die Spanne kommt von der Auflaufprämie: oben bei täglichem Login, unten nur an Tagen mit Transfers.</p>' +
+          '<p>Für dich selbst ergibt dieselbe Rechnung ' + fmtMoney(est.check.estimate) + ', dein echter Kontostand ist ' + fmtMoney(est.check.real) + '.</p></div>';
+      }
     }
 
     var rows = managerRows().filter(function(r){ return r.e; });
     rows.sort(function(a, b){ return b.power - a.power || b.mid - a.mid; });
     var max = Math.max.apply(null, rows.map(function(r){ return r.powerHi; }).concat([1]));
-    html += '<div class="ttl"><b>Wer kann mitbieten?</b><span>Bietkraft</span></div>';
-    rows.forEach(function(r){
+    rows.forEach(function(r, i){
       var e = r.e, open = state.openManager === r.m.id;
-      var konto = r.m.isMe ? short(r.mid) + ' (echt)' : short(r.lo) + ' bis ' + short(r.hi);
+      var konto = r.m.isMe ? short(r.mid) : (Math.round(r.lo / 1e5) === Math.round(r.hi / 1e5) ? short(r.mid) : short(r.lo) + ' bis ' + short(r.hi));
       var odd = !r.m.isMe && r.hi < C.minReachableBudget(e.teamValue);
-      html += '<button class="rank' + (r.full ? ' dim' : '') + '" data-mgr="' + r.m.id + '">' +
-        '<div class="h"><div class="n"><span>' + escapeHtml(r.m.name) + '</span>' + (r.m.isMe ? '<em class="you">DU</em>' : '') + '</div>' +
-        '<div class="p mono">' + (r.full ? 'Kader voll' : (r.m.isMe ? '' : '≈ ') + short(r.power)) + '</div></div>' +
-        '<div class="bar"><i style="width:' + (r.powerHi / max * 100).toFixed(1) + '%"></i>' +
+      var meta = ['Konto ' + konto];
+      if (e.freeSlots != null) meta.push(e.freeSlots + ' frei');
+      meta.push('Kader ' + short(e.teamValue));
+      if (!compact) meta.push(r.m.points + ' P' + (e.wins ? ' · ' + e.wins + '× Sieg' : ''));
+      html += '<button type="button" class="rank' + (r.full ? ' full' : '') + (r.m.isMe ? ' me' : '') + '" data-mgr="' + r.m.id + '">' +
+        '<div class="rank-head"><span class="rank-no num">' + (i + 1) + '</span>' +
+          '<span class="rank-name">' + (r.m.isMe ? 'Du' : escapeHtml(r.m.name)) + '</span>' +
+          '<span class="rank-power num">' + (r.full ? 'Kader voll' : (r.m.isMe ? '' : '≈ ') + short(r.power)) + '</span></div>' +
+        '<div class="rank-bar"><i style="width:' + (r.powerLo / max * 100).toFixed(1) + '%"></i>' +
           (r.powerHi > r.powerLo ? '<s style="left:' + (r.powerLo / max * 100).toFixed(1) + '%;width:' + ((r.powerHi - r.powerLo) / max * 100).toFixed(1) + '%"></s>' : '') + '</div>' +
-        '<div class="m"><span>Konto ' + konto + '</span><span>' + (e.freeSlots == null ? '' : e.freeSlots + ' frei') + '</span>' +
-          '<span>Kader ' + short(e.teamValue) + '</span><span>' + r.m.points + ' P' + (e.wins ? ' · ' + e.wins + '× Sieg' : '') + '</span></div>' +
-        (odd ? '<div class="m dn">Unplausibel tief, vermutlich fehlen Daten.</div>' : '') +
-        (open ? squadHtml(r.m.id) : '') +
+        '<div class="rank-meta num">' + meta.join(' · ') + '</div>' +
+        (odd ? '<div class="rank-meta neg">Unplausibel tief, vermutlich fehlen Daten.</div>' : '') +
+        (open ? managerSquadHtml(r.m.id) : '') +
       '</button>';
     });
-    els.body.innerHTML = html;
-    Array.prototype.forEach.call(els.body.querySelectorAll('[data-mgr]'), function(b){
-      b.addEventListener('click', function(){
-        var id = b.getAttribute('data-mgr');
-        state.openManager = state.openManager === id ? null : id;
-        if (state.openManager && !state.managerSquads[id]) loadManagerSquad(id);
-        render();
-      });
-    });
+    return html + '</section>';
   }
 
   function loadManagerSquad(uid){
@@ -1318,26 +1497,64 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
     client.get("/leagues/" + state.league.i + "/managers/" + uid + "/squad").then(function(sq){
       var order = {TW:1, ABW:2, MF:3, ANG:4};
       var list = ((sq && sq.it) || []).map(function(p){
-        return { name: p.pn || p.n || "Unbekannt", pos: POS_MAP[p.pos] || "–", mv: p.mv || 0, prc: p.prc, ap: p.ap, status: p.st || 0 };
+        return { name: p.pn || p.n || "Unbekannt", pos: POS_MAP[p.pos] || "–", mv: p.mv || 0, prc: p.prc, status: p.st || 0 };
       });
       list.sort(function(a, b){ return (order[a.pos] || 5) - (order[b.pos] || 5) || b.mv - a.mv; });
       state.managerSquads[uid] = {list: list};
     }).catch(function(){ state.managerSquads[uid] = {error: true}; })
-      .then(function(){ if (state.tab === 'gegner' && state.openManager === uid) render(); });
+      .then(function(){ if (state.openManager === uid) render(); });
   }
 
-  function squadHtml(uid){
+  function managerSquadHtml(uid){
     var s = state.managerSquads[uid];
     if (!s || s.loading) return '<div class="opp-squad"><div class="spinner" style="margin:14px auto"></div></div>';
-    if (s.error) return '<div class="opp-squad m">Kader konnte nicht geladen werden.</div>';
+    if (s.error) return '<div class="opp-squad sub">Kader konnte nicht geladen werden.</div>';
     return '<div class="opp-squad">' + s.list.map(function(p){
       var g = p.prc != null ? p.mv - p.prc : null;
-      return '<div class="opp-row"><span class="pos">' + p.pos + '</span><span class="nm">' + escapeHtml(p.name) + (p.status ? ' <span class="dot"></span>' : '') + '</span>' +
-        '<span class="v mono">' + short(p.mv) + (g != null ? '<small class="' + cls(g) + '">' + delta(g) + '</small>' : '') + '</span></div>';
+      return '<div class="opp-row"><span class="pos">' + p.pos + '</span><span class="nm">' + escapeHtml(p.name) + (p.status ? '<span class="dot"></span>' : '') + '</span>' +
+        '<span class="v num">' + short(p.mv) + (g != null ? '<small class="' + negCls(g).trim() + '">' + delta(g) + '</small>' : '') + '</span></div>';
     }).join('') + '</div>';
   }
 
-  // ---------- Sheet: Ligawahl und Menue ----------
+  // ---------- Ereignisse im Inhaltsbereich ----------
+  function bindBody(){
+    each('#body [data-sell]', function(b){
+      b.addEventListener('click', function(){
+        var id = b.getAttribute('data-sell');
+        if (state.sell[id]) delete state.sell[id]; else state.sell[id] = true;
+        render();
+      });
+    });
+    each('#body [data-buy]', function(b){
+      b.addEventListener('click', function(){
+        var id = b.getAttribute('data-buy');
+        var p = state.market.filter(function(x){ return x.id === id; })[0];
+        if (state.bids[id] != null) delete state.bids[id]; else state.bids[id] = p.price;
+        render();
+      });
+    });
+    each('#body [data-bid]', function(inp){
+      inp.addEventListener('change', function(){
+        var v = parseInt(inp.value.replace(/[^0-9]/g, ''), 10);
+        if (!isNaN(v)) state.bids[inp.getAttribute('data-bid')] = v;
+        render();
+      });
+    });
+    each('#body [data-mgr]', function(b){
+      b.addEventListener('click', function(){
+        var id = b.getAttribute('data-mgr');
+        state.openManager = state.openManager === id ? null : id;
+        if (state.openManager && !state.managerSquads[id]) loadManagerSquad(id);
+        render();
+      });
+    });
+    var calc = $('calcBtn');
+    if (calc) calc.addEventListener('click', function(){ state.showCalc = !state.showCalc; render(); });
+    var retry = $('estRetry');
+    if (retry) retry.addEventListener('click', function(){ state.estError = false; render(); });
+  }
+
+  // ---------- Sheet: Ligawahl und Konto (Handy) ----------
   function openSheet(html){
     els.sheet.innerHTML = '<div class="grab"></div>' + html;
     els.sheet.hidden = false; els.sheetBackdrop.hidden = false;
@@ -1346,21 +1563,18 @@ code{ background:var(--surf2); padding:1px 5px; border-radius:5px; font:12px ui-
   els.sheetBackdrop.addEventListener('click', closeSheet);
 
   els.leagueBtn.addEventListener('click', function(){
-    var html = '<h3>Liga wählen</h3>' + state.leagues.map(function(l, i){
+    openSheet('<h3>Liga wählen</h3>' + state.leagues.map(function(l, i){
       var on = state.league && String(state.league.i) === String(l.i);
-      return '<button class="item' + (on ? ' on' : '') + '" data-league="' + i + '">' +
-        (l.lim ? '<img src="' + img(l.lim) + '" alt="">' : '<div class="ph"></div>') +
-        '<div><b>' + escapeHtml(l.n || 'Liga') + '</b><span>' + (l.un != null ? l.un + ' Manager' : '') + '</span></div></button>';
-    }).join('');
-    openSheet(html);
-    Array.prototype.forEach.call(els.sheet.querySelectorAll('[data-league]'), function(b){
-      b.addEventListener('click', function(){ closeSheet(); openLeague(state.leagues[+b.getAttribute('data-league')]); });
+      return '<button type="button" class="item' + (on ? ' on' : '') + '" data-pick="' + i + '">' + escapeHtml(l.n || 'Liga') + '<span>' + cpiLabel(l.cpi) + (l.un != null ? ' · ' + l.un + ' Manager' : '') + '</span></button>';
+    }).join(''));
+    each('#sheet [data-pick]', function(b){
+      b.addEventListener('click', function(){ closeSheet(); openLeague(state.leagues[+b.getAttribute('data-pick')]); });
     });
   });
 
   els.menuBtn.addEventListener('click', function(){
     openSheet('<h3>' + escapeHtml(state.tokenName || 'Konto') + '</h3>' +
-      '<button class="item danger" id="logoutBtn"><div class="ph"></div><div><b>Token ändern</b><span>Abmelden und neuen Token einfügen</span></div></button>');
+      '<button type="button" class="item danger" id="logoutBtn">Abmelden</button>');
     $('logoutBtn').addEventListener('click', logout);
   });
 
