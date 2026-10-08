@@ -1,7 +1,7 @@
 {
   "name": "kaderplaner",
   "version": "1.0.0",
-  "description": "Kaderplaner für Kickbase: Kontostand, 33%-Limit und Bietkraft der Gegner als Scriptable-App mit Homescreen-Widget",
+  "description": "Unofficial Kickbase helper: rival balances, bidding power, the 33% limit and lineup planning by expected points. Web app and Scriptable widget.",
   "private": true,
   "license": "MIT",
   "author": "Alexis Zarucha",

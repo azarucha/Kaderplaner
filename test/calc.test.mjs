@@ -305,3 +305,51 @@ test('Kaufempfehlung: Vereinslimit schliesst aus, Sortierung nach Punkten und Pr
   const r = C.recommendBuys(squad, [], market, { after: 20e6, teamValue: 22e6, clubLimit: 3, clubCounts: { x: 11 } });
   assert.deepEqual(r.list.map(x => x.id), ['billig', 'teuer']);
 });
+
+test('Marktwertverlauf: Tagesindex, ms und ISO werden zu Zeitstempeln, sortiert', () => {
+  const s = C.mvSeries([{ dt: 20370, mv: 2e6 }, { dt: 20368, mv: 1.8e6 }, { dt: '2025-09-01T00:00:00Z', mv: 1.5e6 }, { dt: 20369 }]);
+  assert.deepEqual(s.map(x => x.mv), [1.5e6, 1.8e6, 2e6]);
+  assert.equal(s[1].t, 20368 * 86400000);
+  assert.equal(C.mvAt(s, 20368 * 86400000 + 3600000), 1.8e6);
+  assert.equal(C.mvAt(s, 0), null);
+});
+
+test('Punkte je Spieltag: Startelf, eingewechselt, ohne Einsatz, kommende Spiele fehlen', () => {
+  const r = C.matchdayPoints([
+    { day: 2, st: 3, p: 40, mp: "25'" }, { day: 1, st: 5, p: 120, mp: "90'" },
+    { day: 3, st: 4, p: 0, mp: "0'" }, { day: 4, st: 5, p: -20, mp: "90'" }, { day: 5, st: 0 }
+  ]);
+  assert.deepEqual(r, [
+    { day: 1, p: 120, kind: 'start' }, { day: 2, p: 40, kind: 'sub' },
+    { day: 3, p: 0, kind: 'out' }, { day: 4, p: -20, kind: 'start' }
+  ]);
+});
+
+test('Kontostand im Verlauf: Transfers und Spieltage mit Datum, Rest verteilt, Ende = Ziel', () => {
+  const D = 86400000, c = Date.parse('2026-08-01T00:00:00Z');
+  const h = C.balanceHistory({
+    start: 75e6, created: c, now: c + 4 * D, target: 70e6, pointValue: 1000,
+    transfers: [{ dt: new Date(c + D / 2).toISOString(), tty: 1, trp: 10e6 }, { dt: new Date(c + 3 * D).toISOString(), tty: 2, trp: 4e6 }],
+    matchdays: [{ at: c + 2 * D, points: 1000 }]
+  });
+  assert.equal(h.length, 5);
+  assert.equal(h[0].v, 75e6);
+  assert.equal(h[h.length - 1].v, 70e6);
+  // Kauf an Tag 1 sichtbar, Rest (70 - 75 + 10 - 4 - 1 = 0) ohne Verteilung
+  assert.equal(h[1].v, 65e6);
+  assert.equal(h[2].v, 66e6);
+  assert.equal(h[3].v, 70e6);
+});
+
+test('Gebotshilfe: Median und 75%-Quantil der Aufschlaege, Vorschlag aufgerundet', () => {
+  const st = C.markupStats([
+    { price: 1.0e6, mv: 1e6 }, { price: 1.1e6, mv: 1e6 }, { price: 1.2e6, mv: 1e6 },
+    { price: 0.9e6, mv: 1e6 }, { price: 1e6, mv: 0 }
+  ]);
+  assert.equal(st.n, 4);
+  assert.ok(Math.abs(st.median - 0.05) < 1e-9);
+  assert.ok(Math.abs(st.p75 - 0.125) < 1e-9);
+  assert.equal(C.suggestBid(2e6, st), 2250000);
+  assert.equal(C.suggestBid(2e6, null), null);
+  assert.equal(C.markupStats([]), null);
+});

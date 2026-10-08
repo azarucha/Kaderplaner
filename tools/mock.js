@@ -122,6 +122,22 @@
         ph.push(Object.assign(base, pt > 0 ? {p: pt, mp: sub ? "25'" : "90'", st: sub ? 3 : 5} : {p: 0, mp: "0'", st: 4}));
       }
       return {it: [{ti: "2026/2027", ph: ph}]}; }],
+    [/^\/leagues\/\d+\/players\/(\d+)\/marketvalue\/(\d+)$/, function(m){
+      // Zufallsweg rueckwaerts vom heutigen Marktwert, ein Wert pro Tag (dt = Tagesindex)
+      var p = byId[m[1]] || {mv: 1000000, mvgl: 0}, today = Math.floor(NOW / DAY), v = p.mv, it = [];
+      var drift = (p.mvgl || 0) / Math.max(1, p.mv), wseed = +m[1];
+      function wr(){ wseed = (wseed * 16807) % 2147483647; return (wseed - 1) / 2147483646; }
+      for (var k = 0; k < +m[2]; k++){
+        it.unshift({dt: today - k, mv: round(v, 1000)});
+        v = Math.max(100000, v / (1 + drift * 0.4 + (wr() - 0.5) * 0.05));
+      }
+      return {it: it, hmv: Math.max.apply(null, it.map(function(x){ return x.mv; })), lmv: Math.min.apply(null, it.map(function(x){ return x.mv; }))}; }],
+    [/^\/leagues\/\d+\/players\/(\d+)\/transferHistory$/, function(m){
+      var it = [];
+      managers.forEach(function(mg){
+        transfers[mg.i].forEach(function(t){ if (t.pi === m[1] && t.tty === 1) it.push({u: mg.i, unm: mg.n, dt: t.dt, trp: t.trp, t: 1}); });
+      });
+      return {it: it}; }],
     [/^\/competitions\/\d+\/teams\/(\d+)\/teamprofile$/, function(m){
       return {tid: m[1], it: players.filter(function(p){ return p.tid === m[1]; }).map(function(p){ return {i: p.i, n: p.n, pos: p.pos, ap: p.ap, st: p.st, tid: p.tid}; })}; }]
   ];

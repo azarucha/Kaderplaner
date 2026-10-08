@@ -566,7 +566,87 @@
     return {base: base, ref: ref, gains: gains, list: out};
   }
 
+  // ---------- Kontostand im Verlauf ----------
+  // Ein Wert je Tag vom Ligastart bis jetzt. Transfers und Punktepraemien stehen mit
+  // Datum fest; was kein Datum hat (Erfolge, Auflaufpraemie, Auto-Verkaeufe, Rundung
+  // der Punkte), wird gleichmaessig ueber die Zeit verteilt, sodass der letzte Wert
+  // genau `target` ist (Schaetzung Mitte, beim eigenen Konto der echte Stand).
+  // o: {start, created, now, target, transfers [{dt, tty, trp}], matchdays [{at, points}], pointValue}
+  function balanceHistory(o){
+    var events = [];
+    (o.transfers || []).forEach(function(x){
+      var t = Date.parse(x.dt);
+      if (isFinite(t)) events.push({t: t, v: x.tty === 1 ? -(x.trp || 0) : (x.trp || 0)});
+    });
+    (o.matchdays || []).forEach(function(m){
+      if (isFinite(m.at)) events.push({t: m.at, v: (m.points || 0) * (o.pointValue || 0)});
+    });
+    events.sort(function(a, b){ return a.t - b.t; });
+    var total = events.reduce(function(s, e){ return s + e.v; }, 0);
+    var spread = o.target - (o.start || 0) - total, span = Math.max(1, o.now - o.created);
+    var out = [], sum = o.start || 0, k = 0;
+    for (var t = o.created; ; t = Math.min(t + DAY_MS, o.now)){
+      while (k < events.length && events[k].t <= t){ sum += events[k].v; k++; }
+      out.push({t: t, v: Math.round(sum + spread * (t - o.created) / span)});
+      if (t >= o.now) break;
+    }
+    return out;
+  }
+
+  // ---------- Gebotshilfe ----------
+  // Aufschlag beim Kauf = Preis / Marktwert am Kauftag - 1. Kaeufe von anderen
+  // Managern koennen unter Marktwert liegen; Median und 75%-Quantil sind dagegen robust.
+  function markupStats(list){
+    var r = (list || []).filter(function(x){ return x.mv > 0 && x.price > 0; })
+      .map(function(x){ return x.price / x.mv - 1; }).sort(function(a, b){ return a - b; });
+    if (!r.length) return null;
+    var q = function(p){ var i = (r.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i); return r[lo] + (r[hi] - r[lo]) * (i - lo); };
+    return {n: r.length, median: q(0.5), p75: q(0.75)};
+  }
+
+  // Gebot, das drei von vier bisherigen Ligakaeufen ueberboten haette (auf 10.000 aufgerundet)
+  function suggestBid(mv, stats){
+    if (!stats || !mv) return null;
+    return Math.ceil(mv * (1 + Math.max(0, stats.p75)) / 10000) * 10000;
+  }
+
+  // ---------- Spieler-Detail ----------
+  // Marktwertverlauf aus /players/{P}/marketvalue/92: dt ist ein Tagesindex seit
+  // 1970 (zur Sicherheit auch ms oder ISO-Text). Sortiert, ohne Luecken-Eintraege.
+  function mvSeries(it){
+    return (it || []).map(function(x){
+      var t = typeof x.dt === 'number' ? (x.dt < 1e7 ? x.dt * DAY_MS : x.dt) : Date.parse(x.dt);
+      return {t: t, mv: x.mv};
+    }).filter(function(x){ return isFinite(x.t) && typeof x.mv === 'number'; })
+      .sort(function(a, b){ return a.t - b.t; });
+  }
+
+  // Marktwert zum Zeitpunkt t: letzter Wert davor, null wenn t vor dem Verlauf liegt
+  function mvAt(series, t){
+    var v = null;
+    for (var i = 0; i < series.length && series[i].t <= t; i++) v = series[i].mv;
+    return v;
+  }
+
+  // Gespielte Spieltage einer Saison (ph aus /performance): Punkte und Art des
+  // Einsatzes. Kommende Spiele (st 0 ohne Punkte) fehlen.
+  function matchdayPoints(ph){
+    return (ph || []).filter(function(h){ return h && h.day != null && !(h.st === 0 && h.p == null); })
+      .map(function(h){
+        var mins = parseInt(String(h.mp || '0'), 10) || 0;
+        var kind = h.st === 5 ? 'start' : (h.st === 3 || mins > 0 ? 'sub' : 'out');
+        return {day: h.day, p: kind === 'out' ? 0 : (h.p || 0), kind: kind};
+      })
+      .sort(function(a, b){ return a.day - b.day; });
+  }
+
   return {
+    balanceHistory: balanceHistory,
+    markupStats: markupStats,
+    suggestBid: suggestBid,
+    mvSeries: mvSeries,
+    mvAt: mvAt,
+    matchdayPoints: matchdayPoints,
     FORMATIONS: FORMATIONS,
     recommendBuys: recommendBuys,
     availability: availability,
