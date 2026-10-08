@@ -39,6 +39,16 @@ Prüfstein am 08.10.2026: 75.000.000 − 543.196.551 + 419.613.941 + 25.029.776
 
 Nicht vorhanden (404): Erfolge anderer Manager, ein Budget-Endpunkt für Gegner.
 
+Für Spieler-Detail und Gebotshilfe (Stand 08.10.2026, Felder laut
+[kevinskyba/kickbase-api-doc](https://github.com/kevinskyba/kickbase-api-doc), noch nicht
+an einer echten Liga nachgemessen):
+
+| Endpunkt | Nutzen |
+|---|---|
+| `/leagues/{L}/players/{P}/marketvalue/92` | Marktwertverlauf, `it[]` mit `dt` (Tagesindex seit 1970) und `mv`, dazu `hmv`/`lmv` Hoch/Tief. Auch `365` geht. Die App versucht zur Sicherheit auch die Schreibweise `marketValue`. |
+| `/leagues/{L}/players/{P}/transferHistory?start=0` | Transfers des Spielers in dieser Liga: `unm` Käufer, `trp` Preis, `dt`. Zusammen mit dem Marktwertverlauf ergibt das den Aufschlag am Kauftag. |
+| `/base/predictions/teams/{cpi}` | Kickbase-eigene Aufstellungsprognose, aber nur als **Bild** je Verein (`plpim`, PNG). Für die Einsatzchance nicht auswertbar, deshalb nicht eingebaut. |
+
 ## Gegnerstärke
 
 Für den Gegnerfaktor der erwarteten Punkte lädt die App einmal pro halbem Tag die

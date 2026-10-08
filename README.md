@@ -20,6 +20,10 @@ The app itself is in German. It works for Bundesliga and 2. Bundesliga leagues.
   <img src="docs/screenshots/markt.jpg" width="260" alt="Transfer market with buy recommendation, upcoming opponents and points gained for your eleven">
   <img src="docs/screenshots/gegner.jpg" width="260" alt="Bidding power ranking of the other managers">
 </p>
+<p align="center">
+  <img src="docs/screenshots/spieler.jpg" width="260" alt="Player detail with market value over three months, points per matchday and transfers in the league">
+  <img src="docs/screenshots/verlauf.jpg" width="260" alt="Balance of every manager over the season">
+</p>
 <p align="center"><sub>Screenshots from demo mode with made-up data.</sub></p>
 
 ## What it does
@@ -51,6 +55,16 @@ The app itself is in German. It works for Bundesliga and 2. Bundesliga leagues.
 - **Rivals.** An estimated balance for every manager, shown as a range. From that comes
   their **bidding power** (balance plus room until the 33% limit) and how many squad
   spots they have free. Someone with a full squad can't bid at all.
+- **Player details.** Tap a player to see his market value over the last three
+  months (with your purchase price), his points per matchday split into starts and
+  sub appearances, and who paid what for him in your league.
+- **Bidding help.** Once you note a bid, the app shows how far above market value
+  your league has paid over the last 45 days, which rivals can afford to join in and
+  what they usually pay, and a suggested bid that would have beaten three out of four
+  of those purchases.
+- **Season history.** Every manager's balance over the season, profit from sold
+  players, and a points table per matchday. Managers who look inactive (no transfer
+  for 21 days, no points on the last matchday) can be hidden.
 - **Home screen widget.** Balance, room to spend, next kickoff and the market players
   whose listing ends next.
 - Light and dark mode, multiple leagues, and the token is stored in the iOS keychain.
@@ -152,6 +166,7 @@ flowchart LR
 | File | Contents |
 |---|---|
 | `src/calc.js` | Pure calculation functions without DOM or network, tested in `test/` |
+| `src/charts.js` | Small SVG charts without a library, colored only through the CSS tokens |
 | `src/data.js` | Loads transfers, matchdays, player points and bonuses, runs the estimate |
 | `src/app.js`, `src/index.html`, `src/styles.css` | User interface |
 | `scriptable/wrapper.js` | Scriptable shell: keychain, widget, bridge to the WebView |

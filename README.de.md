@@ -20,6 +20,10 @@ mitbieten kann.
   <img src="docs/screenshots/markt.jpg" width="260" alt="Transfermarkt mit Kaufempfehlung, Gegnern der nächsten Spiele und Gewinn für die Elf">
   <img src="docs/screenshots/gegner.jpg" width="260" alt="Bietkraft-Ranking der Gegner">
 </p>
+<p align="center">
+  <img src="docs/screenshots/spieler.jpg" width="260" alt="Spieler-Detail mit Marktwert der letzten drei Monate, Punkten je Spieltag und Transfers in der Liga">
+  <img src="docs/screenshots/verlauf.jpg" width="260" alt="Kontostand aller Manager im Verlauf der Saison">
+</p>
 <p align="center"><sub>Screenshots aus dem Demo-Modus mit erfundenen Daten.</sub></p>
 
 ## Was die App kann
@@ -52,6 +56,16 @@ mitbieten kann.
 - **Gegner:** geschätzter Kontostand jedes Managers als Spanne, daraus die
   **Bietkraft** (Kontostand plus Spielraum bis zur 33%-Grenze) und freie
   Kaderplätze. Wer keinen Platz frei hat, kann nicht mitbieten.
+- **Spieler-Detail:** Ein Tipp auf einen Spieler zeigt seinen Marktwert der letzten
+  drei Monate (mit deinem Kaufpreis), seine Punkte je Spieltag nach Startelf und
+  Einwechslung und wer in deiner Liga wie viel für ihn gezahlt hat.
+- **Gebotshilfe:** Bei einem vorgemerkten Gebot steht, wie viel die Liga in den
+  letzten 45 Tagen über Marktwert gezahlt hat, wer mitbieten kann und was diese
+  Manager üblicherweise drauflegen, dazu ein Vorschlag, der drei von vier dieser
+  Käufe überboten hätte.
+- **Verlauf:** Kontostand jedes Managers über die Saison, Gewinne aus verkauften
+  Spielern und eine Punktetabelle je Spieltag. Manager, die inaktiv wirken (21 Tage
+  kein Transfer, keine Punkte am letzten Spieltag), lassen sich ausblenden.
 - **Homescreen-Widget:** Kontostand, Spielraum, nächster Anpfiff und die
   Marktspieler, deren Angebot als Nächstes ausläuft.
 - Hell- und Dunkelmodus, mehrere Ligen, der Token liegt in der iOS-Keychain.
@@ -155,6 +169,7 @@ flowchart LR
 | Datei | Inhalt |
 |---|---|
 | `src/calc.js` | Reine Rechenfunktionen ohne DOM und Netzwerk, getestet in `test/` |
+| `src/charts.js` | Kleine SVG-Grafiken ohne Bibliothek, Farben nur über die CSS-Tokens |
 | `src/data.js` | Lädt Transfers, Spieltage, Spielerpunkte und Prämien, rechnet die Schätzung |
 | `src/app.js`, `src/index.html`, `src/styles.css` | Oberfläche |
 | `scriptable/wrapper.js` | Scriptable-Hülle: Keychain, Widget, Brücke zur WebView |
