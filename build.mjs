@@ -14,7 +14,7 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8').replace(/\r\n/g,
 const write = (p, s) => { fs.mkdirSync(path.dirname(path.join(root, p)), { recursive: true }); fs.writeFileSync(path.join(root, p), s); };
 
 const css = read('src/styles.css');
-const js = ['src/calc.js', 'src/data.js', 'src/app.js'].map(read).join('\n');
+const js = ['src/calc.js', 'src/data.js', 'src/charts.js', 'src/app.js'].map(read).join('\n');
 const page = ({ head = '', boot = '', script = js }) => read('src/index.html')
   .replace('<!--__HEAD__-->', () => head)
   .replace('/*__CSS__*/', () => css)

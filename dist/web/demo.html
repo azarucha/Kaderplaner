@@ -351,6 +351,47 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   .buy-hint{ width:100%; margin-left:0; margin-right:0; }
 }
 
+/* Spieler-Detail und Grafiken: nur Tokens, Schwarz/Weiss plus Rot fuer Minus.
+   Linie und Saeulen in --ink, Vergleich in --faint, Raster in --line. */
+.row[data-player]{ cursor:pointer; }
+.row[data-player]:focus-visible{ outline:2px solid var(--ink); outline-offset:-2px; }
+.pd-head{ padding:0 20px 4px; }
+.pd-name{ font-size:20px; font-weight:600; letter-spacing:-.01em; }
+.pd-sub{ font-size:13px; color:var(--mut); margin-top:2px; }
+.pd-sec{ padding:18px 20px 0; }
+.pd-sec + .pd-sec{ margin-top:6px; border-top:1px solid var(--line2); }
+.pd-title{ display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:2px 12px; min-height:20px; }
+.pd-title > span:first-child{ white-space:nowrap; }
+.pd-title > span:first-child{ font-size:12px; font-weight:600; color:var(--mut); text-transform:uppercase; letter-spacing:.04em; }
+.pd-read{ font-size:13px; color:var(--mut); text-align:right; }
+.pd-read b{ color:var(--ink); font-weight:600; }
+.pd-chart{ margin-top:10px; }
+.pd-meta{ margin-top:6px; font-size:12px; color:var(--mut); }
+.pd-legend{ display:flex; flex-wrap:wrap; gap:4px 14px; margin-top:6px; font-size:12px; color:var(--mut); }
+.pd-legend span{ display:inline-flex; align-items:center; gap:6px; }
+.sw{ display:inline-block; width:10px; height:10px; border-radius:2px; }
+.sw.start{ background:var(--ink); } .sw.sub{ background:var(--faint); }
+.sw.out{ height:2px; background:var(--btn-line); }
+.pd-tr{ display:grid; grid-template-columns:auto minmax(0, 1fr) auto; gap:12px; align-items:baseline; padding:10px 0; border-top:1px solid var(--line2); font-size:14px; }
+.pd-sec .pd-title + .pd-tr{ margin-top:8px; }
+.pd-tr-date{ color:var(--mut); font-size:13px; }
+.pd-tr-who{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pd-tr-price{ font-weight:600; text-align:right; }
+.pd-tr-price small{ display:block; font-size:12px; font-weight:400; color:var(--mut); }
+.ch{ display:block; max-width:100%; overflow:visible; touch-action:pan-y; }
+.ch text{ font-size:12px; fill:var(--mut); font-variant-numeric:tabular-nums; }
+.ch .ch-max{ fill:var(--ink); font-weight:600; }
+.ch .ch-reflabel{ paint-order:stroke; stroke:var(--bg); stroke-width:4px; stroke-linejoin:round; }
+.ch-grid{ stroke:var(--line); stroke-width:1; }
+.ch-ref{ stroke:var(--faint); stroke-width:1; }
+.ch-line{ fill:none; stroke:var(--ink); stroke-width:2; stroke-linejoin:round; stroke-linecap:round; }
+.ch-dot{ fill:var(--ink); stroke:var(--bg); stroke-width:2; }
+.ch-cross{ stroke:var(--faint); stroke-width:1; }
+.ch-bar.start{ fill:var(--ink); } .ch-bar.sub{ fill:var(--faint); }
+.ch-bar.neg{ fill:var(--neg); } .ch-bar.out{ fill:var(--btn-line); }
+.ch.picking .ch-bar:not(.on){ opacity:.35; }
+.ch-hit{ fill:transparent; }
+
 </style>
 </head>
 <body>
@@ -619,6 +660,22 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
         ph.push(Object.assign(base, pt > 0 ? {p: pt, mp: sub ? "25'" : "90'", st: sub ? 3 : 5} : {p: 0, mp: "0'", st: 4}));
       }
       return {it: [{ti: "2026/2027", ph: ph}]}; }],
+    [/^\/leagues\/\d+\/players\/(\d+)\/marketvalue\/(\d+)$/, function(m){
+      // Zufallsweg rueckwaerts vom heutigen Marktwert, ein Wert pro Tag (dt = Tagesindex)
+      var p = byId[m[1]] || {mv: 1000000, mvgl: 0}, today = Math.floor(NOW / DAY), v = p.mv, it = [];
+      var drift = (p.mvgl || 0) / Math.max(1, p.mv), wseed = +m[1];
+      function wr(){ wseed = (wseed * 16807) % 2147483647; return (wseed - 1) / 2147483646; }
+      for (var k = 0; k < +m[2]; k++){
+        it.unshift({dt: today - k, mv: round(v, 1000)});
+        v = Math.max(100000, v / (1 + drift * 0.4 + (wr() - 0.5) * 0.05));
+      }
+      return {it: it, hmv: Math.max.apply(null, it.map(function(x){ return x.mv; })), lmv: Math.min.apply(null, it.map(function(x){ return x.mv; }))}; }],
+    [/^\/leagues\/\d+\/players\/(\d+)\/transferHistory$/, function(m){
+      var it = [];
+      managers.forEach(function(mg){
+        transfers[mg.i].forEach(function(t){ if (t.pi === m[1] && t.tty === 1) it.push({u: mg.i, unm: mg.n, dt: t.dt, trp: t.trp, t: 1}); });
+      });
+      return {it: it}; }],
     [/^\/competitions\/\d+\/teams\/(\d+)\/teamprofile$/, function(m){
       return {tid: m[1], it: players.filter(function(p){ return p.tid === m[1]; }).map(function(p){ return {i: p.i, n: p.n, pos: p.pos, ap: p.ap, st: p.st, tid: p.tid}; })}; }]
   ];
@@ -1238,7 +1295,40 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     return {base: base, ref: ref, gains: gains, list: out};
   }
 
+  // ---------- Spieler-Detail ----------
+  // Marktwertverlauf aus /players/{P}/marketvalue/92: dt ist ein Tagesindex seit
+  // 1970 (zur Sicherheit auch ms oder ISO-Text). Sortiert, ohne Luecken-Eintraege.
+  function mvSeries(it){
+    return (it || []).map(function(x){
+      var t = typeof x.dt === 'number' ? (x.dt < 1e7 ? x.dt * DAY_MS : x.dt) : Date.parse(x.dt);
+      return {t: t, mv: x.mv};
+    }).filter(function(x){ return isFinite(x.t) && typeof x.mv === 'number'; })
+      .sort(function(a, b){ return a.t - b.t; });
+  }
+
+  // Marktwert zum Zeitpunkt t: letzter Wert davor, null wenn t vor dem Verlauf liegt
+  function mvAt(series, t){
+    var v = null;
+    for (var i = 0; i < series.length && series[i].t <= t; i++) v = series[i].mv;
+    return v;
+  }
+
+  // Gespielte Spieltage einer Saison (ph aus /performance): Punkte und Art des
+  // Einsatzes. Kommende Spiele (st 0 ohne Punkte) fehlen.
+  function matchdayPoints(ph){
+    return (ph || []).filter(function(h){ return h && h.day != null && !(h.st === 0 && h.p == null); })
+      .map(function(h){
+        var mins = parseInt(String(h.mp || '0'), 10) || 0;
+        var kind = h.st === 5 ? 'start' : (h.st === 3 || mins > 0 ? 'sub' : 'out');
+        return {day: h.day, p: kind === 'out' ? 0 : (h.p || 0), kind: kind};
+      })
+      .sort(function(a, b){ return a.day - b.day; });
+  }
+
   return {
+    mvSeries: mvSeries,
+    mvAt: mvAt,
+    matchdayPoints: matchdayPoints,
     FORMATIONS: FORMATIONS,
     recommendBuys: recommendBuys,
     availability: availability,
@@ -1528,10 +1618,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   function fetchForms(client, cpi, ids){
     return pool(ids, 6, function(id){
       return client.get("/competitions/" + cpi + "/players/" + id + "/performance").then(function(d){
-        var seasons = (d && d.it) || [], cur = null;
-        seasons.forEach(function(s){
-          if (!cur || String(s.ti) > String(cur.ti) || (s.ti === cur.ti && (s.ph || []).length > (cur.ph || []).length)) cur = s;
-        });
+        var seasons = (d && d.it) || [], cur = latestSeason(seasons);
         var prev = cur && seasons.filter(function(s){ return s.ti === prevSeason(cur.ti); })[0];
         // Konstanz: Startelf-Einsaetze dieser Saison (Gewicht 1) und der letzten (0,5)
         var starts = [];
@@ -1551,6 +1638,35 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
         out[x.id].cons = x.cons;
       });
       return out;
+    });
+  }
+
+  function latestSeason(seasons){
+    var cur = null;
+    (seasons || []).forEach(function(s){
+      if (!cur || String(s.ti) > String(cur.ti) || (s.ti === cur.ti && (s.ph || []).length > (cur.ph || []).length)) cur = s;
+    });
+    return cur;
+  }
+
+  // Spieler-Detail: Marktwertverlauf (3 Monate), Punkte je Spieltag dieser Saison und
+  // Transfers des Spielers in der Liga. Jeder Teil darf fehlen (null), wenn der
+  // Abruf scheitert.
+  function fetchPlayerDetail(client, leagueId, cpi, pid){
+    var base = "/leagues/" + leagueId + "/players/" + pid;
+    var none = function(){ return null; };
+    return Promise.all([
+      client.get(base + "/marketvalue/92").catch(function(){ return client.get(base + "/marketValue/92"); }).catch(none),
+      client.get("/competitions/" + cpi + "/players/" + pid + "/performance").catch(none),
+      client.get(base + "/transferHistory?start=0").catch(none)
+    ]).then(function(r){
+      var mv = r[0] ? C.mvSeries(r[0].it) : null;
+      var season = r[1] ? latestSeason(r[1].it) : null;
+      var transfers = r[2] ? ((r[2].it) || []).map(function(t){
+        var at = Date.parse(t.dt);
+        return {at: at, user: t.unm || null, price: t.trp || 0, mvThen: mv ? C.mvAt(mv, at) : null};
+      }).sort(function(a, b){ return b.at - a.at; }) : null;
+      return {mv: mv, season: season ? season.ti : null, points: season ? C.matchdayPoints(season.ph) : null, transfers: transfers};
     });
   }
 
@@ -1714,8 +1830,175 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     return {games: games, factor: C.horizonFactor(games.map(function(g){ return g.f; }), horizon)};
   }
 
-  root.KBData = { createClient: createClient, pool: pool, estimateAll: estimateAll, fetchTransfers: fetchTransfers, fetchForms: fetchForms,
+  root.KBData = { createClient: createClient, pool: pool, estimateAll: estimateAll, fetchTransfers: fetchTransfers, fetchForms: fetchForms, fetchPlayerDetail: fetchPlayerDetail,
     fetchOpponentModel: fetchOpponentModel, buildOpponentModel: buildOpponentModel, fixturesFor: fixturesFor, mapTeams: mapTeams, normName: normName };
+})(typeof self !== 'undefined' ? self : this);
+
+// Kaderplaner - kleine SVG-Grafiken ohne Bibliothek. Farben kommen nur ueber
+// CSS-Klassen aus styles.css (Tokens --ink, --faint, --line, --neg), damit hell und
+// dunkel automatisch passen. Liefert HTML-Strings; bind* haengt Zeigen/Tippen an.
+(function (root) {
+  "use strict";
+
+  var PLOT_TOP = 8, AXIS_H = 20, LABEL_W = 52;
+
+  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); }
+  function r1(n){ return Math.round(n * 10) / 10; }
+
+  // Runde Teilung fuer 3-4 Rasterlinien (1, 2, 2,5, 5 je Zehnerpotenz)
+  function niceStep(span, count){
+    var raw = span / Math.max(1, count), mag = Math.pow(10, Math.floor(Math.log10(raw || 1)));
+    var steps = [1, 2, 2.5, 5, 10];
+    for (var i = 0; i < steps.length; i++) if (steps[i] * mag >= raw) return steps[i] * mag;
+    return 10 * mag;
+  }
+  function ticks(lo, hi, count){
+    var step = niceStep(hi - lo, count), out = [];
+    for (var v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9; v += step) out.push(v);
+    return out;
+  }
+
+  function dateLabel(t){ var d = new Date(t); return d.getDate() + '.' + (d.getMonth() + 1) + '.'; }
+
+  // ---------- Linie: Marktwertverlauf ----------
+  function lineGeom(series, opts){
+    var w = opts.width, h = opts.height || 132, plotH = h - PLOT_TOP - AXIS_H, plotW = w - LABEL_W;
+    var vals = series.map(function(p){ return p.mv; });
+    if (opts.ref != null) vals.push(opts.ref);
+    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    var pad = (hi - lo) * 0.08 || hi * 0.05 || 1;
+    lo = Math.max(0, lo - pad); hi = hi + pad;
+    var t0 = series[0].t, t1 = series[series.length - 1].t;
+    return {
+      w: w, h: h, plotW: plotW, plotH: plotH, lo: lo, hi: hi,
+      x: function(t){ return t1 === t0 ? plotW / 2 : (t - t0) / (t1 - t0) * plotW; },
+      y: function(v){ return PLOT_TOP + (1 - (v - lo) / (hi - lo)) * plotH; }
+    };
+  }
+
+  function line(series, opts){
+    if (!series || series.length < 2) return '';
+    var g = lineGeom(series, opts), fmt = opts.fmt || String, out = [];
+    out.push('<svg class="ch" width="' + g.w + '" height="' + g.h + '" viewBox="0 0 ' + g.w + ' ' + g.h + '" role="img" aria-label="' + esc(opts.label || '') + '">');
+    ticks(g.lo, g.hi, 3).forEach(function(v){
+      var y = r1(g.y(v));
+      out.push('<line class="ch-grid" x1="0" x2="' + g.plotW + '" y1="' + y + '" y2="' + y + '"/>');
+      out.push('<text x="' + (g.plotW + 8) + '" y="' + (y + 4) + '">' + esc(fmt(v)) + '</text>');
+    });
+    var base = PLOT_TOP + g.plotH;
+    out.push('<text x="0" y="' + (base + 16) + '">' + dateLabel(series[0].t) + '</text>');
+    out.push('<text x="' + g.plotW + '" y="' + (base + 16) + '" text-anchor="end">' + dateLabel(series[series.length - 1].t) + '</text>');
+    if (opts.ref != null){
+      var ry = r1(g.y(opts.ref));
+      out.push('<line class="ch-ref" x1="0" x2="' + g.plotW + '" y1="' + ry + '" y2="' + ry + '"/>');
+      if (opts.refLabel) out.push('<text class="ch-reflabel" x="4" y="' + (ry - 5) + '">' + esc(opts.refLabel) + '</text>');
+    }
+    var d = series.map(function(p, i){ return (i ? 'L' : 'M') + r1(g.x(p.t)) + ' ' + r1(g.y(p.mv)); }).join('');
+    out.push('<path class="ch-line" d="' + d + '"/>');
+    out.push('<line class="ch-cross" data-cross x1="0" x2="0" y1="' + PLOT_TOP + '" y2="' + base + '" hidden/>');
+    var last = series[series.length - 1];
+    out.push('<circle class="ch-dot" data-dot r="4" cx="' + r1(g.x(last.t)) + '" cy="' + r1(g.y(last.mv)) + '"/>');
+    out.push('<rect class="ch-hit" x="0" y="0" width="' + g.plotW + '" height="' + g.h + '"/>');
+    return out.join('') + '</svg>';
+  }
+
+  // Zeigen oder Tippen: Fadenkreuz auf den naechsten Tag, Wert in readout.
+  // Ohne Zeiger zeigt readout wieder den letzten Wert.
+  function bindLine(svg, series, opts, readout, text){
+    if (!svg || !series || series.length < 2) return;
+    var g = lineGeom(series, opts), cross = svg.querySelector('[data-cross]'), dot = svg.querySelector('[data-dot]');
+    function showAt(i){
+      var p = series[i], x = r1(g.x(p.t));
+      cross.setAttribute('x1', x); cross.setAttribute('x2', x); cross.removeAttribute('hidden');
+      dot.setAttribute('cx', x); dot.setAttribute('cy', r1(g.y(p.mv)));
+      if (readout) readout.innerHTML = text(p, i);
+    }
+    function reset(){
+      var i = series.length - 1;
+      cross.setAttribute('hidden', '');
+      dot.setAttribute('cx', r1(g.x(series[i].t))); dot.setAttribute('cy', r1(g.y(series[i].mv)));
+      if (readout) readout.innerHTML = text(series[i], i);
+    }
+    function move(e){
+      var box = svg.getBoundingClientRect(), x = (e.clientX - box.left) * (g.w / box.width);
+      var best = 0, dist = Infinity;
+      series.forEach(function(p, i){ var dd = Math.abs(g.x(p.t) - x); if (dd < dist){ dist = dd; best = i; } });
+      showAt(best);
+    }
+    svg.addEventListener('pointermove', move);
+    svg.addEventListener('pointerdown', move);
+    svg.addEventListener('pointerleave', reset);
+    reset();
+  }
+
+  // ---------- Saeulen: Punkte je Spieltag ----------
+  // points: [{day, p, kind: 'start'|'sub'|'out'}]. Saeulen hoechstens 24px breit,
+  // 4px runde Kante am Datenende, eckig an der Nulllinie.
+  function barGeom(points, opts){
+    var w = opts.width, h = opts.height || 112, plotH = h - PLOT_TOP - AXIS_H;
+    var hi = Math.max(10, Math.max.apply(null, points.map(function(p){ return p.p; })));
+    var lo = Math.min(0, Math.min.apply(null, points.map(function(p){ return p.p; })));
+    var n = Math.max(points.length, opts.minSlots || 0), slot = w / n;
+    return {
+      w: w, h: h, slot: slot, bw: Math.max(3, Math.min(24, slot - 2)), lo: lo, hi: hi,
+      y: function(v){ return PLOT_TOP + (1 - (v - lo) / (hi - lo)) * plotH; }
+    };
+  }
+
+  function barPath(x, y0, y1, w){
+    var top = Math.min(y0, y1), bot = Math.max(y0, y1), r = Math.min(4, w / 2, bot - top);
+    if (y1 <= y0){   // nach oben: oben rund
+      return 'M' + x + ' ' + bot + 'V' + (top + r) + 'Q' + x + ' ' + top + ' ' + (x + r) + ' ' + top +
+        'H' + (x + w - r) + 'Q' + (x + w) + ' ' + top + ' ' + (x + w) + ' ' + (top + r) + 'V' + bot + 'Z';
+    }
+    return 'M' + x + ' ' + top + 'V' + (bot - r) + 'Q' + x + ' ' + bot + ' ' + (x + r) + ' ' + bot +
+      'H' + (x + w - r) + 'Q' + (x + w) + ' ' + bot + ' ' + (x + w) + ' ' + (bot - r) + 'V' + top + 'Z';
+  }
+
+  function bars(points, opts){
+    if (!points || !points.length) return '';
+    var g = barGeom(points, opts), out = [], y0 = r1(g.y(0)), maxI = 0;
+    points.forEach(function(p, i){ if (p.p > points[maxI].p) maxI = i; });
+    out.push('<svg class="ch" width="' + g.w + '" height="' + g.h + '" viewBox="0 0 ' + g.w + ' ' + g.h + '" role="img" aria-label="' + esc(opts.label || '') + '">');
+    out.push('<line class="ch-grid" x1="0" x2="' + g.w + '" y1="' + y0 + '" y2="' + y0 + '"/>');
+    points.forEach(function(p, i){
+      var x = r1(i * g.slot + (g.slot - g.bw) / 2), cls = p.kind === 'out' ? 'out' : (p.p < 0 ? 'neg' : p.kind);
+      if (p.kind === 'out') out.push('<rect class="ch-bar out" data-bar="' + i + '" x="' + x + '" y="' + (y0 - 2) + '" width="' + r1(g.bw) + '" height="2" rx="1"/>');
+      else if (p.p !== 0) out.push('<path class="ch-bar ' + cls + '" data-bar="' + i + '" d="' + barPath(x, y0, r1(g.y(p.p)), r1(g.bw)) + '"/>');
+      else out.push('<rect class="ch-bar ' + cls + '" data-bar="' + i + '" x="' + x + '" y="' + (y0 - 2) + '" width="' + r1(g.bw) + '" height="2" rx="1"/>');
+      // Spieltag unter der Saeule: erster, letzter und jeder fuenfte
+      if (i === 0 || i === points.length - 1 || p.day % 5 === 0)
+        out.push('<text x="' + r1(i * g.slot + g.slot / 2) + '" y="' + (g.h - 4) + '" text-anchor="middle">' + p.day + '</text>');
+    });
+    // Nur der beste Spieltag bekommt seinen Wert, der Rest steht im Tooltip
+    var mp = points[maxI];
+    if (mp.p > 0) out.push('<text class="ch-max" x="' + r1(maxI * g.slot + g.slot / 2) + '" y="' + r1(g.y(mp.p) - 5) + '" text-anchor="middle">' + mp.p + '</text>');
+    points.forEach(function(p, i){
+      out.push('<rect class="ch-hit" data-hit="' + i + '" x="' + r1(i * g.slot) + '" y="0" width="' + r1(g.slot) + '" height="' + g.h + '"/>');
+    });
+    return out.join('') + '</svg>';
+  }
+
+  function bindBars(svg, points, readout, text, idle){
+    if (!svg || !points || !points.length) return;
+    var active = null;
+    function set(i){
+      if (active === i) return;
+      active = i;
+      svg.classList.toggle('picking', i != null);
+      Array.prototype.forEach.call(svg.querySelectorAll('[data-bar]'), function(b){ b.classList.toggle('on', +b.getAttribute('data-bar') === i); });
+      if (readout) readout.innerHTML = i == null ? idle : text(points[i]);
+    }
+    Array.prototype.forEach.call(svg.querySelectorAll('[data-hit]'), function(r){
+      var i = +r.getAttribute('data-hit');
+      r.addEventListener('pointerenter', function(){ set(i); });
+      r.addEventListener('pointerdown', function(){ set(i); });
+    });
+    svg.addEventListener('pointerleave', function(e){ if (e.pointerType === 'mouse') set(null); });
+    if (readout) readout.innerHTML = idle;
+  }
+
+  root.KBCharts = { line: line, bindLine: bindLine, bars: bars, bindBars: bindBars, ticks: ticks };
 })(typeof self !== 'undefined' ? self : this);
 
 (function(){
@@ -2163,7 +2446,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   function squadRow(p, compact, withPoints){
     if (p.bought){
       // Vorgemerkter Kauf: kommt bei Erfolg dazu, laesst sich nur als Gebot zuruecknehmen
-      return '<div class="row' + (compact ? '' : ' np') + '">' + (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
+      return '<div class="row' + (compact ? '' : ' np') + '"' + playerAttr(p) + '>' + (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
         '<div class="main"><div class="name">' + escapeHtml(p.name) + '</div><div class="sub num">Gebot ' + short(state.bids[p.id]) + (p.ap != null ? ' · Ø ' + p.ap : '') + '</div></div>' +
         '<div class="fig num"><div class="v">' + short(p.mv) + '</div></div>' +
         '<button type="button" class="btn on" data-buy="' + p.id + '">Gemerkt</button></div>';
@@ -2180,7 +2463,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     if (fxh) sub.push(fxh);
     if (p.offers) sub.push(p.offers + ' Angebot' + (p.offers > 1 ? 'e' : ''));
     if (p.day != null) sub.push('<span class="' + signCls(p.day) + '">24h ' + delta(p.day) + '</span>');
-    return '<div class="row' + (sold ? ' on sold' : '') + (compact ? '' : ' np') + '">' +
+    return '<div class="row' + (sold ? ' on sold' : '') + (compact ? '' : ' np') + '"' + playerAttr(p) + '>' +
       (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
       '<div class="main"><div class="name">' + escapeHtml(p.name) + (p.status ? '<span class="dot" title="Status beachten"></span>' : '') + '</div>' +
         '<div class="sub num">' + sub.join(' · ') + '</div></div>' +
@@ -2637,7 +2920,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     var fxm = fixtureHtml(p);
     if (fxm) sub.push(fxm);
     if (!compact && state.clubNames[p.tid]) sub.push(escapeHtml(state.clubNames[p.tid]));
-    var html = '<div class="row' + (marked ? ' on' : '') + (compact ? '' : ' np') + '">' +
+    var html = '<div class="row' + (marked ? ' on' : '') + (compact ? '' : ' np') + '"' + playerAttr(p) + '>' +
       (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
       '<div class="main"><div class="name">' + escapeHtml(p.name) + (p.status ? '<span class="dot" title="Status beachten"></span>' : '') + '</div>' +
         '<div class="sub num">' + sub.join(' · ') + '</div></div>' +
@@ -2834,6 +3117,15 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   }
 
   function bindBody(){
+    each('#body .row[data-player]', function(r){
+      r.addEventListener('click', function(e){
+        if (e.target.closest('button, input, label, a')) return;
+        openPlayer(r.getAttribute('data-player'));
+      });
+      r.addEventListener('keydown', function(e){
+        if (e.target === r && (e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); openPlayer(r.getAttribute('data-player')); }
+      });
+    });
     each('#body [data-sell]', function(b){
       b.addEventListener('click', function(){
         var id = b.getAttribute('data-sell');
@@ -2962,8 +3254,88 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     els.sheet.innerHTML = '<div class="grab"></div>' + html;
     els.sheet.hidden = false; els.sheetBackdrop.hidden = false;
   }
-  function closeSheet(){ els.sheet.hidden = true; els.sheetBackdrop.hidden = true; }
+  function closeSheet(){ els.sheet.hidden = true; els.sheetBackdrop.hidden = true; els.sheet.removeAttribute('data-player'); }
   els.sheetBackdrop.addEventListener('click', closeSheet);
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !els.sheet.hidden) closeSheet(); });
+
+  // ---------- Sheet: Spieler-Detail ----------
+  // Marktwertverlauf, Punkte je Spieltag und Transfers in der Liga. Die Daten kommen
+  // beim Oeffnen, pro Liga und Spieler fuer 30 Minuten im Speicher.
+  var detailCache = {}, DETAIL_TTL = 30 * 60000;
+  var dateFmt = new Intl.DateTimeFormat('de-DE', {day: 'numeric', month: 'numeric', year: '2-digit'});
+  var KIND_LABEL = {start: 'Startelf', sub: 'eingewechselt', out: 'nicht eingesetzt'};
+
+  function playerAttr(p){ return ' data-player="' + escapeHtml(p.id) + '" tabindex="0"'; }
+
+  function openPlayer(id){
+    var own = state.players.filter(function(x){ return x.id === id; })[0];
+    var p = own || marketById(id);
+    if (!p || !state.league) return;
+    var sub = [p.pos, state.clubNames[p.tid], 'MW ' + short(p.mv)].filter(Boolean).map(escapeHtml);
+    openSheet('<div class="pd-head"><div class="pd-name">' + escapeHtml(p.name) + '</div><div class="pd-sub num">' + sub.join(' · ') + '</div></div>' +
+      '<div id="pdBody"><p class="sheet-note">Lädt …</p></div>');
+    els.sheet.setAttribute('data-player', id);
+    var key = state.league.i + '|' + id, hit = detailCache[key];
+    var done = function(d){
+      if (els.sheet.hidden || els.sheet.getAttribute('data-player') !== id) return;
+      renderPlayer(p, own, d);
+    };
+    if (hit && Date.now() - hit.at < DETAIL_TTL) return done(hit.d);
+    KBData.fetchPlayerDetail(client, state.league.i, state.league.cpi || 1, id).then(function(d){
+      detailCache[key] = {at: Date.now(), d: d};
+      done(d);
+    }).catch(function(){
+      var b = $('pdBody');
+      if (b && els.sheet.getAttribute('data-player') === id) b.innerHTML = '<p class="sheet-note">Konnte die Spielerdaten nicht laden.</p>';
+    });
+  }
+
+  function renderPlayer(p, own, d){
+    var body = $('pdBody');
+    if (!body) return;
+    var width = Math.max(240, Math.min(480, els.sheet.clientWidth - 40));
+    var buy = own && p.gain != null ? p.mv - p.gain : null;
+    var html = '';
+
+    var mv = d.mv && d.mv.length > 1 ? d.mv : null;
+    if (mv){
+      var first = mv[0].mv, last = mv[mv.length - 1].mv, lo = Infinity, hi = -Infinity;
+      mv.forEach(function(x){ lo = Math.min(lo, x.mv); hi = Math.max(hi, x.mv); });
+      html += '<section class="pd-sec"><div class="pd-title"><span>Marktwert · 3 Monate</span><span class="pd-read num" id="pdMvRead"></span></div>' +
+        '<div class="pd-chart" id="pdMv">' + KBCharts.line(mv, {width: width, ref: buy, refLabel: buy != null ? 'Kauf ' + short(buy) : null, fmt: short, label: 'Marktwertverlauf'}) + '</div>' +
+        '<div class="pd-meta num">Tief ' + short(lo) + ' · Hoch ' + short(hi) + ' · <span class="' + signCls(last - first) + '">' + delta(last - first) + '</span> in 3 Monaten</div></section>';
+    }
+
+    var pts = d.points && d.points.length ? d.points : null, idle = '';
+    if (pts){
+      var played = pts.filter(function(x){ return x.kind !== 'out'; }), starts = pts.filter(function(x){ return x.kind === 'start'; }).length;
+      var avg = played.length ? Math.round(played.reduce(function(s, x){ return s + x.p; }, 0) / played.length) : 0;
+      idle = (played.length ? 'Ø ' + avg + ' · ' : '') + starts + '/' + pts.length + ' Startelf';
+      html += '<section class="pd-sec"><div class="pd-title"><span>Punkte je Spieltag</span><span class="pd-read num" id="pdPtsRead"></span></div>' +
+        '<div class="pd-chart" id="pdPts">' + KBCharts.bars(pts, {width: width, minSlots: 10, label: 'Punkte je Spieltag'}) + '</div>' +
+        '<div class="pd-legend"><span><i class="sw start"></i>Startelf</span><span><i class="sw sub"></i>eingewechselt</span><span><i class="sw out"></i>nicht eingesetzt</span></div></section>';
+    }
+
+    if (d.transfers){
+      html += '<section class="pd-sec"><div class="pd-title"><span>Transfers in dieser Liga</span></div>';
+      if (!d.transfers.length) html += '<p class="pd-meta">Noch keine Transfers in dieser Liga.</p>';
+      d.transfers.slice(0, 6).forEach(function(t){
+        var pct = t.mvThen ? Math.round((t.price / t.mvThen - 1) * 100) : null;
+        html += '<div class="pd-tr num"><span class="pd-tr-date">' + dateFmt.format(new Date(t.at)) + '</span>' +
+          '<span class="pd-tr-who">' + escapeHtml(t.user || 'Kickbase') + '</span>' +
+          '<span class="pd-tr-price">' + short(t.price) + (pct != null ? '<small>' + (pct >= 0 ? '+' : '−') + Math.abs(pct) + ' % zum MW</small>' : '') + '</span></div>';
+      });
+      html += '</section>';
+    }
+
+    body.innerHTML = html || '<p class="sheet-note">Für diesen Spieler gibt es noch keine Daten.</p>';
+    if (mv) KBCharts.bindLine($('pdMv').querySelector('svg'), mv, {width: width, ref: buy}, $('pdMvRead'), function(x){
+      return dateFmt.format(new Date(x.t)) + ' · <b>' + short(x.mv) + '</b>';
+    });
+    if (pts) KBCharts.bindBars($('pdPts').querySelector('svg'), pts, $('pdPtsRead'), function(x){
+      return x.day + '. Spieltag · <b>' + x.p + ' P</b> · ' + KIND_LABEL[x.kind];
+    }, idle);
+  }
 
   els.leagueBtn.addEventListener('click', function(){
     openSheet('<h3>Liga wählen</h3>' + state.leagues.map(function(l, i){

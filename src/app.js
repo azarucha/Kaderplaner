@@ -443,7 +443,7 @@
   function squadRow(p, compact, withPoints){
     if (p.bought){
       // Vorgemerkter Kauf: kommt bei Erfolg dazu, laesst sich nur als Gebot zuruecknehmen
-      return '<div class="row' + (compact ? '' : ' np') + '">' + (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
+      return '<div class="row' + (compact ? '' : ' np') + '"' + playerAttr(p) + '>' + (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
         '<div class="main"><div class="name">' + escapeHtml(p.name) + '</div><div class="sub num">Gebot ' + short(state.bids[p.id]) + (p.ap != null ? ' · Ø ' + p.ap : '') + '</div></div>' +
         '<div class="fig num"><div class="v">' + short(p.mv) + '</div></div>' +
         '<button type="button" class="btn on" data-buy="' + p.id + '">Gemerkt</button></div>';
@@ -460,7 +460,7 @@
     if (fxh) sub.push(fxh);
     if (p.offers) sub.push(p.offers + ' Angebot' + (p.offers > 1 ? 'e' : ''));
     if (p.day != null) sub.push('<span class="' + signCls(p.day) + '">24h ' + delta(p.day) + '</span>');
-    return '<div class="row' + (sold ? ' on sold' : '') + (compact ? '' : ' np') + '">' +
+    return '<div class="row' + (sold ? ' on sold' : '') + (compact ? '' : ' np') + '"' + playerAttr(p) + '>' +
       (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
       '<div class="main"><div class="name">' + escapeHtml(p.name) + (p.status ? '<span class="dot" title="Status beachten"></span>' : '') + '</div>' +
         '<div class="sub num">' + sub.join(' · ') + '</div></div>' +
@@ -917,7 +917,7 @@
     var fxm = fixtureHtml(p);
     if (fxm) sub.push(fxm);
     if (!compact && state.clubNames[p.tid]) sub.push(escapeHtml(state.clubNames[p.tid]));
-    var html = '<div class="row' + (marked ? ' on' : '') + (compact ? '' : ' np') + '">' +
+    var html = '<div class="row' + (marked ? ' on' : '') + (compact ? '' : ' np') + '"' + playerAttr(p) + '>' +
       (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
       '<div class="main"><div class="name">' + escapeHtml(p.name) + (p.status ? '<span class="dot" title="Status beachten"></span>' : '') + '</div>' +
         '<div class="sub num">' + sub.join(' · ') + '</div></div>' +
@@ -1114,6 +1114,15 @@
   }
 
   function bindBody(){
+    each('#body .row[data-player]', function(r){
+      r.addEventListener('click', function(e){
+        if (e.target.closest('button, input, label, a')) return;
+        openPlayer(r.getAttribute('data-player'));
+      });
+      r.addEventListener('keydown', function(e){
+        if (e.target === r && (e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); openPlayer(r.getAttribute('data-player')); }
+      });
+    });
     each('#body [data-sell]', function(b){
       b.addEventListener('click', function(){
         var id = b.getAttribute('data-sell');
@@ -1242,8 +1251,88 @@
     els.sheet.innerHTML = '<div class="grab"></div>' + html;
     els.sheet.hidden = false; els.sheetBackdrop.hidden = false;
   }
-  function closeSheet(){ els.sheet.hidden = true; els.sheetBackdrop.hidden = true; }
+  function closeSheet(){ els.sheet.hidden = true; els.sheetBackdrop.hidden = true; els.sheet.removeAttribute('data-player'); }
   els.sheetBackdrop.addEventListener('click', closeSheet);
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !els.sheet.hidden) closeSheet(); });
+
+  // ---------- Sheet: Spieler-Detail ----------
+  // Marktwertverlauf, Punkte je Spieltag und Transfers in der Liga. Die Daten kommen
+  // beim Oeffnen, pro Liga und Spieler fuer 30 Minuten im Speicher.
+  var detailCache = {}, DETAIL_TTL = 30 * 60000;
+  var dateFmt = new Intl.DateTimeFormat('de-DE', {day: 'numeric', month: 'numeric', year: '2-digit'});
+  var KIND_LABEL = {start: 'Startelf', sub: 'eingewechselt', out: 'nicht eingesetzt'};
+
+  function playerAttr(p){ return ' data-player="' + escapeHtml(p.id) + '" tabindex="0"'; }
+
+  function openPlayer(id){
+    var own = state.players.filter(function(x){ return x.id === id; })[0];
+    var p = own || marketById(id);
+    if (!p || !state.league) return;
+    var sub = [p.pos, state.clubNames[p.tid], 'MW ' + short(p.mv)].filter(Boolean).map(escapeHtml);
+    openSheet('<div class="pd-head"><div class="pd-name">' + escapeHtml(p.name) + '</div><div class="pd-sub num">' + sub.join(' · ') + '</div></div>' +
+      '<div id="pdBody"><p class="sheet-note">Lädt …</p></div>');
+    els.sheet.setAttribute('data-player', id);
+    var key = state.league.i + '|' + id, hit = detailCache[key];
+    var done = function(d){
+      if (els.sheet.hidden || els.sheet.getAttribute('data-player') !== id) return;
+      renderPlayer(p, own, d);
+    };
+    if (hit && Date.now() - hit.at < DETAIL_TTL) return done(hit.d);
+    KBData.fetchPlayerDetail(client, state.league.i, state.league.cpi || 1, id).then(function(d){
+      detailCache[key] = {at: Date.now(), d: d};
+      done(d);
+    }).catch(function(){
+      var b = $('pdBody');
+      if (b && els.sheet.getAttribute('data-player') === id) b.innerHTML = '<p class="sheet-note">Konnte die Spielerdaten nicht laden.</p>';
+    });
+  }
+
+  function renderPlayer(p, own, d){
+    var body = $('pdBody');
+    if (!body) return;
+    var width = Math.max(240, Math.min(480, els.sheet.clientWidth - 40));
+    var buy = own && p.gain != null ? p.mv - p.gain : null;
+    var html = '';
+
+    var mv = d.mv && d.mv.length > 1 ? d.mv : null;
+    if (mv){
+      var first = mv[0].mv, last = mv[mv.length - 1].mv, lo = Infinity, hi = -Infinity;
+      mv.forEach(function(x){ lo = Math.min(lo, x.mv); hi = Math.max(hi, x.mv); });
+      html += '<section class="pd-sec"><div class="pd-title"><span>Marktwert · 3 Monate</span><span class="pd-read num" id="pdMvRead"></span></div>' +
+        '<div class="pd-chart" id="pdMv">' + KBCharts.line(mv, {width: width, ref: buy, refLabel: buy != null ? 'Kauf ' + short(buy) : null, fmt: short, label: 'Marktwertverlauf'}) + '</div>' +
+        '<div class="pd-meta num">Tief ' + short(lo) + ' · Hoch ' + short(hi) + ' · <span class="' + signCls(last - first) + '">' + delta(last - first) + '</span> in 3 Monaten</div></section>';
+    }
+
+    var pts = d.points && d.points.length ? d.points : null, idle = '';
+    if (pts){
+      var played = pts.filter(function(x){ return x.kind !== 'out'; }), starts = pts.filter(function(x){ return x.kind === 'start'; }).length;
+      var avg = played.length ? Math.round(played.reduce(function(s, x){ return s + x.p; }, 0) / played.length) : 0;
+      idle = (played.length ? 'Ø ' + avg + ' · ' : '') + starts + '/' + pts.length + ' Startelf';
+      html += '<section class="pd-sec"><div class="pd-title"><span>Punkte je Spieltag</span><span class="pd-read num" id="pdPtsRead"></span></div>' +
+        '<div class="pd-chart" id="pdPts">' + KBCharts.bars(pts, {width: width, minSlots: 10, label: 'Punkte je Spieltag'}) + '</div>' +
+        '<div class="pd-legend"><span><i class="sw start"></i>Startelf</span><span><i class="sw sub"></i>eingewechselt</span><span><i class="sw out"></i>nicht eingesetzt</span></div></section>';
+    }
+
+    if (d.transfers){
+      html += '<section class="pd-sec"><div class="pd-title"><span>Transfers in dieser Liga</span></div>';
+      if (!d.transfers.length) html += '<p class="pd-meta">Noch keine Transfers in dieser Liga.</p>';
+      d.transfers.slice(0, 6).forEach(function(t){
+        var pct = t.mvThen ? Math.round((t.price / t.mvThen - 1) * 100) : null;
+        html += '<div class="pd-tr num"><span class="pd-tr-date">' + dateFmt.format(new Date(t.at)) + '</span>' +
+          '<span class="pd-tr-who">' + escapeHtml(t.user || 'Kickbase') + '</span>' +
+          '<span class="pd-tr-price">' + short(t.price) + (pct != null ? '<small>' + (pct >= 0 ? '+' : '−') + Math.abs(pct) + ' % zum MW</small>' : '') + '</span></div>';
+      });
+      html += '</section>';
+    }
+
+    body.innerHTML = html || '<p class="sheet-note">Für diesen Spieler gibt es noch keine Daten.</p>';
+    if (mv) KBCharts.bindLine($('pdMv').querySelector('svg'), mv, {width: width, ref: buy}, $('pdMvRead'), function(x){
+      return dateFmt.format(new Date(x.t)) + ' · <b>' + short(x.mv) + '</b>';
+    });
+    if (pts) KBCharts.bindBars($('pdPts').querySelector('svg'), pts, $('pdPtsRead'), function(x){
+      return x.day + '. Spieltag · <b>' + x.p + ' P</b> · ' + KIND_LABEL[x.kind];
+    }, idle);
+  }
 
   els.leagueBtn.addEventListener('click', function(){
     openSheet('<h3>Liga wählen</h3>' + state.leagues.map(function(l, i){

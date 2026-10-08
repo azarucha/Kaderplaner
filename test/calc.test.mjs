@@ -305,3 +305,22 @@ test('Kaufempfehlung: Vereinslimit schliesst aus, Sortierung nach Punkten und Pr
   const r = C.recommendBuys(squad, [], market, { after: 20e6, teamValue: 22e6, clubLimit: 3, clubCounts: { x: 11 } });
   assert.deepEqual(r.list.map(x => x.id), ['billig', 'teuer']);
 });
+
+test('Marktwertverlauf: Tagesindex, ms und ISO werden zu Zeitstempeln, sortiert', () => {
+  const s = C.mvSeries([{ dt: 20370, mv: 2e6 }, { dt: 20368, mv: 1.8e6 }, { dt: '2025-09-01T00:00:00Z', mv: 1.5e6 }, { dt: 20369 }]);
+  assert.deepEqual(s.map(x => x.mv), [1.5e6, 1.8e6, 2e6]);
+  assert.equal(s[1].t, 20368 * 86400000);
+  assert.equal(C.mvAt(s, 20368 * 86400000 + 3600000), 1.8e6);
+  assert.equal(C.mvAt(s, 0), null);
+});
+
+test('Punkte je Spieltag: Startelf, eingewechselt, ohne Einsatz, kommende Spiele fehlen', () => {
+  const r = C.matchdayPoints([
+    { day: 2, st: 3, p: 40, mp: "25'" }, { day: 1, st: 5, p: 120, mp: "90'" },
+    { day: 3, st: 4, p: 0, mp: "0'" }, { day: 4, st: 5, p: -20, mp: "90'" }, { day: 5, st: 0 }
+  ]);
+  assert.deepEqual(r, [
+    { day: 1, p: 120, kind: 'start' }, { day: 2, p: 40, kind: 'sub' },
+    { day: 3, p: 0, kind: 'out' }, { day: 4, p: -20, kind: 'start' }
+  ]);
+});

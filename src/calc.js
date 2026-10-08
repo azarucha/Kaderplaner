@@ -566,7 +566,40 @@
     return {base: base, ref: ref, gains: gains, list: out};
   }
 
+  // ---------- Spieler-Detail ----------
+  // Marktwertverlauf aus /players/{P}/marketvalue/92: dt ist ein Tagesindex seit
+  // 1970 (zur Sicherheit auch ms oder ISO-Text). Sortiert, ohne Luecken-Eintraege.
+  function mvSeries(it){
+    return (it || []).map(function(x){
+      var t = typeof x.dt === 'number' ? (x.dt < 1e7 ? x.dt * DAY_MS : x.dt) : Date.parse(x.dt);
+      return {t: t, mv: x.mv};
+    }).filter(function(x){ return isFinite(x.t) && typeof x.mv === 'number'; })
+      .sort(function(a, b){ return a.t - b.t; });
+  }
+
+  // Marktwert zum Zeitpunkt t: letzter Wert davor, null wenn t vor dem Verlauf liegt
+  function mvAt(series, t){
+    var v = null;
+    for (var i = 0; i < series.length && series[i].t <= t; i++) v = series[i].mv;
+    return v;
+  }
+
+  // Gespielte Spieltage einer Saison (ph aus /performance): Punkte und Art des
+  // Einsatzes. Kommende Spiele (st 0 ohne Punkte) fehlen.
+  function matchdayPoints(ph){
+    return (ph || []).filter(function(h){ return h && h.day != null && !(h.st === 0 && h.p == null); })
+      .map(function(h){
+        var mins = parseInt(String(h.mp || '0'), 10) || 0;
+        var kind = h.st === 5 ? 'start' : (h.st === 3 || mins > 0 ? 'sub' : 'out');
+        return {day: h.day, p: kind === 'out' ? 0 : (h.p || 0), kind: kind};
+      })
+      .sort(function(a, b){ return a.day - b.day; });
+  }
+
   return {
+    mvSeries: mvSeries,
+    mvAt: mvAt,
+    matchdayPoints: matchdayPoints,
     FORMATIONS: FORMATIONS,
     recommendBuys: recommendBuys,
     availability: availability,

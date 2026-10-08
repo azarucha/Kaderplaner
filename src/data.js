@@ -253,10 +253,7 @@
   function fetchForms(client, cpi, ids){
     return pool(ids, 6, function(id){
       return client.get("/competitions/" + cpi + "/players/" + id + "/performance").then(function(d){
-        var seasons = (d && d.it) || [], cur = null;
-        seasons.forEach(function(s){
-          if (!cur || String(s.ti) > String(cur.ti) || (s.ti === cur.ti && (s.ph || []).length > (cur.ph || []).length)) cur = s;
-        });
+        var seasons = (d && d.it) || [], cur = latestSeason(seasons);
         var prev = cur && seasons.filter(function(s){ return s.ti === prevSeason(cur.ti); })[0];
         // Konstanz: Startelf-Einsaetze dieser Saison (Gewicht 1) und der letzten (0,5)
         var starts = [];
@@ -276,6 +273,35 @@
         out[x.id].cons = x.cons;
       });
       return out;
+    });
+  }
+
+  function latestSeason(seasons){
+    var cur = null;
+    (seasons || []).forEach(function(s){
+      if (!cur || String(s.ti) > String(cur.ti) || (s.ti === cur.ti && (s.ph || []).length > (cur.ph || []).length)) cur = s;
+    });
+    return cur;
+  }
+
+  // Spieler-Detail: Marktwertverlauf (3 Monate), Punkte je Spieltag dieser Saison und
+  // Transfers des Spielers in der Liga. Jeder Teil darf fehlen (null), wenn der
+  // Abruf scheitert.
+  function fetchPlayerDetail(client, leagueId, cpi, pid){
+    var base = "/leagues/" + leagueId + "/players/" + pid;
+    var none = function(){ return null; };
+    return Promise.all([
+      client.get(base + "/marketvalue/92").catch(function(){ return client.get(base + "/marketValue/92"); }).catch(none),
+      client.get("/competitions/" + cpi + "/players/" + pid + "/performance").catch(none),
+      client.get(base + "/transferHistory?start=0").catch(none)
+    ]).then(function(r){
+      var mv = r[0] ? C.mvSeries(r[0].it) : null;
+      var season = r[1] ? latestSeason(r[1].it) : null;
+      var transfers = r[2] ? ((r[2].it) || []).map(function(t){
+        var at = Date.parse(t.dt);
+        return {at: at, user: t.unm || null, price: t.trp || 0, mvThen: mv ? C.mvAt(mv, at) : null};
+      }).sort(function(a, b){ return b.at - a.at; }) : null;
+      return {mv: mv, season: season ? season.ti : null, points: season ? C.matchdayPoints(season.ph) : null, transfers: transfers};
     });
   }
 
@@ -439,6 +465,6 @@
     return {games: games, factor: C.horizonFactor(games.map(function(g){ return g.f; }), horizon)};
   }
 
-  root.KBData = { createClient: createClient, pool: pool, estimateAll: estimateAll, fetchTransfers: fetchTransfers, fetchForms: fetchForms,
+  root.KBData = { createClient: createClient, pool: pool, estimateAll: estimateAll, fetchTransfers: fetchTransfers, fetchForms: fetchForms, fetchPlayerDetail: fetchPlayerDetail,
     fetchOpponentModel: fetchOpponentModel, buildOpponentModel: buildOpponentModel, fixturesFor: fixturesFor, mapTeams: mapTeams, normName: normName };
 })(typeof self !== 'undefined' ? self : this);
