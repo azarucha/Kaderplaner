@@ -43,7 +43,8 @@ g.Request = class {
   async loadJSON(){ const r = await fetch(this.url, { headers: this.headers }); this.response = { statusCode: r.status }; return r.json(); }
 };
 g.ListWidget = class { constructor(){ lines.push('widget (' + family + ')'); Object.assign(this, node('widget', 0)); } };
-g.LinearGradient = class {}; g.Point = class {}; g.Color = class { static white(){ return new Color(); } };
+g.LinearGradient = class {}; g.Point = class {};
+g.Color = class { static white(){ return new g.Color(); } static dynamic(l){ return l; } };
 g.Font = { boldRoundedSystemFont: () => ({}), mediumSystemFont: () => ({}) };
 g.DateFormatter = class { string(d){ return d.toISOString().slice(0, 16); } };
 g.URLScheme = { forRunningScript: () => 'scriptable:///run/Kaderplaner' };

@@ -127,17 +127,16 @@ async function loadWidgetData() {
 
 async function buildWidget(family) {
   const d = await loadWidgetData();
+  // Gleiche Farben wie die App: Schwarz/Weiss, Gruen nur fuer den Spielraum, Rot fuer Minus.
+  const dyn = (light, dark) => Color.dynamic(new Color(light), new Color(dark));
   const w = new ListWidget();
-  const grad = new LinearGradient();
-  grad.colors = [new Color("#ff5a1f"), new Color("#7b2ff7")];
-  grad.locations = [0, 1];
-  grad.startPoint = new Point(0, 0);
-  grad.endPoint = new Point(1, 1);
-  w.backgroundGradient = grad;
+  w.backgroundColor = dyn("#ffffff", "#0e0e0e");
   w.setPadding(14, 14, 14, 14);
   w.url = URLScheme.forRunningScript();
-  const white = Color.white();
-  const soft = new Color("#ffffff", 0.78);
+  const white = dyn("#111111", "#f2f2f0");   // Haupttext
+  const soft = dyn("#6b6b6b", "#9a9a96");    // Nebentext
+  const acc = dyn("#1a7f4e", "#3fb37a");
+  const neg = dyn("#b42318", "#ff7a6b");
 
   const text = (stack, str, size, opts = {}) => {
     const t = stack.addText(str);
@@ -171,9 +170,9 @@ async function buildWidget(family) {
   left.layoutVertically();
   left.addSpacer(4);
   text(left, "Kontostand", 10, { color: soft });
-  text(left, short(d.budget), isSmall ? 24 : 26, { bold: true, min: 0.6 });
+  text(left, short(d.budget), isSmall ? 24 : 26, { bold: true, min: 0.6, color: d.budget < 0 ? neg : white });
   left.addSpacer(4);
-  text(left, "Spielraum " + short(d.room), 11, { color: d.room < 0 ? new Color("#ffd2cc") : white, min: 0.7 });
+  text(left, "Spielraum " + short(d.room), 11, { color: d.room < 0 ? neg : acc, min: 0.7 });
   text(left, "Kader " + d.squad + (d.limit ? "/" + d.limit : ""), 11, { color: soft });
   if (d.kickoff) {
     const df = new DateFormatter();
@@ -200,7 +199,7 @@ async function buildWidget(family) {
       text(row, short(p.price), 11, {});
       const sub = right.addStack();
       text(sub, countdown(p.exs) + (p.bids ? " · " + p.bids + " Gebot" + (p.bids > 1 ? "e" : "") : ""), 10, {
-        color: p.exs < 1800 ? new Color("#ffe1a6") : soft,
+        color: p.exs < 1800 ? neg : soft,
       });
     });
     if (!d.expiring.length) text(right, "Markt ist leer", 11, { color: soft });
