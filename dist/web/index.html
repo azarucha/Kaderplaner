@@ -146,13 +146,23 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
 .subhead h3{ font-size:15px; font-weight:600; }
 .subhead span{ font-size:13px; color:var(--mut); }
 
-.row{ display:flex; align-items:center; gap:12px; min-height:64px; padding:8px 20px; border-top:1px solid var(--line2); }
+/* Zeile: oben Name, Wert, Knopf; darunter die Infozeile ueber die volle Breite,
+   die umbrechen darf statt abgeschnitten zu werden. */
+.row{ display:grid; grid-template-columns:auto minmax(0, 1fr) auto auto; grid-template-areas:"pos name fig btn" "pos sub sub btn";
+  column-gap:12px; row-gap:2px; align-items:center; min-height:64px; padding:10px 20px; border-top:1px solid var(--line2); }
+.row.np{ grid-template-columns:minmax(0, 1fr) auto auto; grid-template-areas:"name fig btn" "sub sub btn"; }
 .row.on{ background:var(--hi); }
+.row > .main{ display:contents; }
+.row .pos{ grid-area:pos; }
+.row .name{ grid-area:name; }
+.row .sub{ grid-area:sub; white-space:normal; overflow:visible; }
+.row .fig{ grid-area:fig; }
+.row .btn{ grid-area:btn; }
 .pos{ width:30px; flex:none; font-size:11px; font-weight:600; color:var(--faint); }
 .main{ flex:1; min-width:0; }
 .name{ font-size:16px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .row.sold .name{ text-decoration:line-through; }
-.sub{ font-size:13px; color:var(--mut); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sub{ font-size:13px; line-height:1.4; color:var(--mut); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .sub .urgent{ color:var(--neg); font-weight:600; }
 .dot{ display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--neg); margin-left:6px; vertical-align:middle; }
 .fig{ text-align:right; flex:none; }
@@ -201,6 +211,20 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
 .bench-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:20px 20px 8px; font-size:13px; color:var(--mut); }
 .bench-head b{ color:var(--ink); font-size:15px; font-weight:600; }
 .sheet-note{ padding:8px 20px 12px; font-size:14px; color:var(--mut); }
+.slot.picked .av{ border:2px solid var(--ink); }
+.slot.missing .av{ border-color:var(--neg); color:var(--neg); }
+.slot.missing .sn{ color:var(--neg); }
+.lineup-note{ margin:12px 20px 0; padding:10px 12px; border-radius:10px; background:var(--hi); font-size:13.5px; line-height:1.45; }
+.picker{ margin:12px 20px 0; border:1px solid var(--ink); border-radius:14px; overflow:hidden; }
+.picker-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:2px 12px 2px 16px; border-bottom:1px solid var(--line); }
+.picker-head b{ font-size:15px; font-weight:600; }
+.picker .row{ padding-left:16px; padding-right:12px; }
+.picker .row:first-of-type{ border-top:0; }
+.picker-note{ padding:12px 16px; font-size:13.5px; color:var(--mut); }
+.picker-foot{ padding:0 16px; border-top:1px solid var(--line2); }
+.need{ margin-top:8px; }
+.need-title{ padding:12px 20px 2px; font-size:15px; font-weight:600; color:var(--neg); }
+.need-sub{ padding:0 20px 4px; font-size:13px; line-height:1.45; color:var(--mut); }
 
 /* Gegner */
 .check{ display:flex; align-items:center; gap:8px; padding:4px 20px 8px; font-size:13px; color:var(--mut); }
@@ -300,7 +324,8 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   .cols .rank-power{ font-size:15px; }
   .panel-head, .panel-intro, .group, .subhead, .row, .rank, .check, .calc, .bidrow,
   .formations, .pitch-meta, .pitch-hint, .bench-head{ padding-left:0; padding-right:0; }
-  .seg, .pitch, .advice{ margin-left:0; margin-right:0; }
+  .seg, .pitch, .advice, .picker, .lineup-note{ margin-left:0; margin-right:0; }
+  .need-title, .need-sub{ padding-left:0; padding-right:0; }
   .cols .seg{ margin-top:12px; }
   .cols .slot{ width:58px; }
   .cols .slot .sn{ max-width:58px; }
@@ -1248,7 +1273,8 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       budget:0, players:[], sell:{}, market:[], bids:{},
       managers:[], overview:null, clubNames:{}, nextKickoff:null, matchday:null,
       estimates:null, estLoading:false, estError:false, estProgress:"", showCalc:false,
-      openManager:null, managerSquads:{}, tab:null, loading:false, lineup:null, forms:null
+      openManager:null, managerSquads:{}, tab:null, loading:false, lineup:null, forms:null,
+      pick:null, lineupNote:null
     };
   }
   var state = initialState();
@@ -1563,7 +1589,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   function squadRow(p, compact){
     if (p.bought){
       // Vorgemerkter Kauf: kommt bei Erfolg dazu, laesst sich nur als Gebot zuruecknehmen
-      return '<div class="row">' + (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
+      return '<div class="row' + (compact ? '' : ' np') + '">' + (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
         '<div class="main"><div class="name">' + escapeHtml(p.name) + '</div><div class="sub num">Gebot ' + short(state.bids[p.id]) + (p.ap != null ? ' · Ø ' + p.ap : '') + '</div></div>' +
         '<div class="fig num"><div class="v">' + short(p.mv) + '</div></div>' +
         '<button type="button" class="btn on" data-buy="' + p.id + '">Gemerkt</button></div>';
@@ -1575,11 +1601,12 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     var f = formOf(p);
     if (f && f.recentDays) sub.push(f.recentStarts + '/' + f.recentDays + ' Startelf');
     if (p.offers) sub.push(p.offers + ' Angebot' + (p.offers > 1 ? 'e' : ''));
-    return '<div class="row' + (sold ? ' on sold' : '') + '">' +
+    if (p.day != null) sub.push('<span class="' + signCls(p.day) + '">24h ' + delta(p.day) + '</span>');
+    return '<div class="row' + (sold ? ' on sold' : '') + (compact ? '' : ' np') + '">' +
       (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
       '<div class="main"><div class="name">' + escapeHtml(p.name) + (p.status ? '<span class="dot" title="Status beachten"></span>' : '') + '</div>' +
         '<div class="sub num">' + sub.join(' · ') + '</div></div>' +
-      '<div class="fig num"><div class="v">' + short(p.mv) + '</div>' + (p.day != null ? '<div class="d ' + signCls(p.day) + '">' + delta(p.day) + '</div>' : '') + '</div>' +
+      '<div class="fig num"><div class="v">' + short(p.mv) + '</div></div>' +
       '<button type="button" class="btn' + (sold ? ' on' : '') + '" data-sell="' + p.id + '">' + (sold ? 'Verkauft' : 'Verkaufen') + '</button>' +
     '</div>';
   }
@@ -1706,22 +1733,29 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       return '<button type="button" class="chip' + (f === lu.formation ? ' on' : '') + '" data-formation="' + f + '">' + f + '</button>';
     }).join('') + '</div>';
 
-    var count = 0, points = 0, value = 0;
+    if (state.lineupNote) html += '<p class="lineup-note">' + escapeHtml(state.lineupNote) + '</p>';
+
+    var count = 0, points = 0, value = 0, missing = {};
     html += '<div class="pitch">' + LINE_ORDER.map(function(pos){
       return '<div class="line">' + lu.slots[pos].map(function(id, i){
-        var p = id && playerById(id);
-        if (!p) return '<button type="button" class="slot empty" data-slot="' + pos + ':' + i + '" aria-label="' + POS_LABEL[pos] + ' wählen"><span class="av">+</span><span class="sn">' + pos + '</span></button>';
+        var p = id && playerById(id), key = pos + ':' + i, picked = state.pick === key ? ' picked' : '';
+        if (!p){
+          missing[pos] = (missing[pos] || 0) + 1;
+          return '<button type="button" class="slot empty missing' + picked + '" data-slot="' + key + '" aria-label="' + POS_LABEL[pos] + ' wählen"><span class="av">+</span><span class="sn">fehlt</span><span class="sv">' + pos + '</span></button>';
+        }
         var e = expected(p);
         count++; points += e; value += p.mv;
-        return '<button type="button" class="slot" data-slot="' + pos + ':' + i + '"><span class="av num" title="erwartete Punkte pro Spieltag">' + (p.ap != null || formOf(p) ? Math.round(e) : '–') + '</span>' +
+        return '<button type="button" class="slot' + picked + '" data-slot="' + key + '"><span class="av num" title="erwartete Punkte pro Spieltag">' + (p.ap != null || formOf(p) ? Math.round(e) : '–') + '</span>' +
           '<span class="sn">' + escapeHtml(p.name) + '</span><span class="sv num">' + short(p.mv) + '</span></button>';
       }).join('') + '</div>';
     }).join('') + '</div>';
 
+    if (state.pick) html += pickerHtml();
+
     html += '<div class="pitch-meta num"><span>' + count + ' / 11 · ≈ ' + Math.round(points).toLocaleString('de-DE') + ' P/Spieltag · ' + short(value) + '</span>' +
       '<span class="pitch-actions"><button type="button" class="text-btn" id="lineupKb">Aus Kickbase</button>' +
       '<button type="button" class="text-btn" id="lineupAuto">Beste Elf</button></span></div>';
-    if (count < 11) html += '<p class="pitch-hint">' + (11 - count) + ' Platz' + (11 - count > 1 ? 'e' : '') + ' leer: Jeder leere Platz kostet 100 Punkte.</p>';
+    if (!state.pick) html += needHtml(missing, placed);
 
     var bench = lineupPool().filter(function(p){ return !placed[p.id]; })
       .sort(function(a, b){ return POS_ORDER.indexOf(a.pos) - POS_ORDER.indexOf(b.pos) || b.mv - a.mv; });
@@ -1735,24 +1769,46 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     return html;
   }
 
-  function openSlotSheet(pos, i){
-    var placed = placedIds(), current = state.lineup.slots[pos][i];
-    var list = lineupPool().filter(function(p){ return p.pos === pos && !state.sell[p.id]; })
+  // Auswahl direkt unter dem Feld: Platz antippen, dann passenden Spieler waehlen
+  function pickerHtml(){
+    var s = state.pick.split(':'), pos = s[0], i = +s[1];
+    var current = state.lineup.slots[pos][i], placed = placedIds();
+    var list = lineupPool().filter(function(p){ return p.pos === pos && !state.sell[p.id] && p.id !== current; })
       .sort(function(a, b){ return expected(b) - expected(a); });
-    var html = '<h3>' + POS_LABEL[pos] + ' wählen</h3>' + list.map(function(p){
-      var f = formOf(p);
-      var tag = p.id === current ? 'aufgestellt hier' : (placed[p.id] ? 'tauscht Platz' : (p.bought ? 'Gebot' : 'Bank'));
-      return '<button type="button" class="item' + (p.id === current ? ' on' : '') + '" data-assign="' + p.id + '">' + escapeHtml(p.name) +
-        '<span class="num">≈ ' + Math.round(expected(p)) + ' P' + (f ? ' · ' + f.recentStarts + '/' + f.recentDays + ' Startelf' : '') + ' · ' + short(p.mv) + ' · ' + tag + '</span></button>';
-    }).join('');
-    if (!list.length) html += '<p class="sheet-note">Kein ' + POS_LABEL[pos] + ' im Kader (verkaufte Spieler zählen nicht).</p>';
-    if (current) html += '<button type="button" class="item danger" id="slotClear">Platz leeren</button>';
-    openSheet(html);
-    each('#sheet [data-assign]', function(b){
-      b.addEventListener('click', function(){ assignSlot(pos, i, b.getAttribute('data-assign')); closeSheet(); render(); });
+    var cur = current && playerById(current);
+    var html = '<div class="picker"><div class="picker-head"><b>' + (cur ? escapeHtml(cur.name) + ' ersetzen' : POS_LABEL[pos] + ' wählen') + '</b>' +
+      '<button type="button" class="text-btn" id="pickCancel">Schließen</button></div>';
+    list.forEach(function(p){
+      var f = formOf(p), info = ['≈ ' + Math.round(expected(p)) + ' P'];
+      if (f && f.recentDays) info.push(f.recentStarts + '/' + f.recentDays + ' Startelf');
+      info.push(placed[p.id] ? 'auf dem Feld' : (p.bought ? 'Gebot' : 'Bank'));
+      html += '<div class="row"><span class="pos">' + p.pos + '</span>' +
+        '<div class="main"><div class="name">' + escapeHtml(p.name) + (p.status ? '<span class="dot"></span>' : '') + '</div><div class="sub num">' + info.join(' · ') + '</div></div>' +
+        '<div class="fig num"><div class="v">' + short(p.mv) + '</div></div>' +
+        '<button type="button" class="btn" data-assign="' + p.id + '">' + (placed[p.id] ? 'Tauschen' : 'Einwechseln') + '</button></div>';
     });
-    var clear = $('slotClear');
-    if (clear) clear.addEventListener('click', function(){ state.lineup.slots[pos][i] = null; saveLineup(); closeSheet(); render(); });
+    if (!list.length) html += '<p class="picker-note">Kein weiterer ' + POS_LABEL[pos] + ' im Kader. Unten im Markt findest du passende Spieler.</p>';
+    if (current) html += '<div class="picker-foot"><button type="button" class="text-btn" id="slotClear">Platz leeren</button></div>';
+    return html + '</div>';
+  }
+
+  // Leere Plaetze ohne Ersatz im Kader: was fehlt, und die besten passenden Marktspieler
+  function needHtml(missing, placed){
+    var positions = POS_ORDER.filter(function(pos){ return missing[pos]; });
+    if (!positions.length) return '';
+    var label = positions.map(function(pos){ return missing[pos] + ' × ' + POS_LABEL[pos]; }).join(', ');
+    var html = '<div class="need"><p class="need-title">Es fehlt: ' + label + '</p>' +
+      '<p class="need-sub">Jeder leere Platz kostet 100 Punkte. Tippe auf einen leeren Platz, um jemanden aus deinem Kader einzusetzen.</p>';
+    positions.forEach(function(pos){
+      var bench = lineupPool().filter(function(p){ return p.pos === pos && !state.sell[p.id] && !placed[p.id]; });
+      if (bench.length) return;   // Ersatz ist da, nur noch nicht eingesetzt
+      var offers = state.market.filter(function(m){ return m.pos === pos && state.bids[m.id] == null; })
+        .sort(function(a, b){ return expected(b) - expected(a) || a.price - b.price; }).slice(0, 3);
+      if (!offers.length) return;
+      html += '<div class="subhead"><h3>' + POS_LABEL[pos] + ' im Markt</h3><span>nach erwarteten Punkten</span></div>';
+      offers.forEach(function(m){ html += marketRow(m, true); });
+    });
+    return html + '</div>';
   }
 
   // ---------- Empfehlung: ins Plus kommen ----------
@@ -1797,8 +1853,13 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   function applyAdvice(kind){
     var a = salesAdvice(), r = a && a[kind];
     if (!r) return;
+    var names = r.ids.map(function(id){ var p = playerById(id); return p ? p.name : ''; }).filter(Boolean);
     r.ids.forEach(function(id){ state.sell[id] = true; });
     state.lineup = buildLineup(r.formation, bestIds());
+    state.pick = null;
+    var empty = emptyCount(state.lineup);
+    state.lineupNote = names.join(', ') + ' zum Verkauf vorgemerkt. Neue Elf: ' + r.formation +
+      (empty ? ', ' + empty + ' Platz' + (empty > 1 ? 'e' : '') + ' bleibt leer.' : ', alle Plätze besetzt.');
     saveLineup();
   }
 
@@ -1842,7 +1903,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     }
     if (p.bids) sub.push(p.bids + ' Gebot' + (p.bids > 1 ? 'e' : ''));
     if (!compact && state.clubNames[p.tid]) sub.push(escapeHtml(state.clubNames[p.tid]));
-    var html = '<div class="row' + (marked ? ' on' : '') + '">' +
+    var html = '<div class="row' + (marked ? ' on' : '') + (compact ? '' : ' np') + '">' +
       (compact ? '<span class="pos">' + p.pos + '</span>' : '') +
       '<div class="main"><div class="name">' + escapeHtml(p.name) + (p.status ? '<span class="dot" title="Status beachten"></span>' : '') + '</div>' +
         '<div class="sub num">' + sub.join(' · ') + '</div></div>' +
@@ -1989,12 +2050,51 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   }
 
   // ---------- Ereignisse im Inhaltsbereich ----------
-  // Verkaufte Spieler verlassen das Feld
+  function emptyCount(lu){
+    var n = 0;
+    POS_ORDER.forEach(function(pos){ lu.slots[pos].forEach(function(x){ if (!x) n++; }); });
+    return n;
+  }
+  function lineupPoints(lu){
+    var s = 0;
+    POS_ORDER.forEach(function(pos){ lu.slots[pos].forEach(function(id){ var p = id && playerById(id); if (p) s += expected(p); }); });
+    return s;
+  }
+
+  // Ein verkaufter Spieler verlaesst das Feld. Ersatz in dieser Reihenfolge:
+  // bester Bankspieler derselben Position, sonst eine Formation, in der die Elf
+  // wieder voll wird, sonst bleibt der Platz leer (rot) und "Es fehlt" zeigt den Bedarf.
   function removeFromLineup(id){
     if (!state.lineup) return;
+    var hole = null, gone = playerById(id);
     POS_ORDER.forEach(function(pos){
-      state.lineup.slots[pos].forEach(function(x, j){ if (x === id) state.lineup.slots[pos][j] = null; });
+      state.lineup.slots[pos].forEach(function(x, j){ if (x === id){ state.lineup.slots[pos][j] = null; hole = {pos: pos, j: j}; } });
     });
+    if (!hole) return;
+    var name = gone ? gone.name : 'den Spieler';
+    var placed = placedIds();
+    var sub = lineupPool().filter(function(p){ return p.pos === hole.pos && !state.sell[p.id] && !placed[p.id]; })
+      .sort(function(a, b){ return expected(b) - expected(a); })[0];
+    if (sub){
+      state.lineup.slots[hole.pos][hole.j] = sub.id;
+      state.lineupNote = sub.name + ' rückt für ' + name + ' nach.';
+    } else {
+      var keep = [];
+      LINE_ORDER.slice().reverse().forEach(function(pos){ state.lineup.slots[pos].forEach(function(x){ if (x) keep.push(x); }); });
+      var ids = keep.concat(bestIds()), best = null;
+      FORMATIONS.forEach(function(f){
+        var lu = buildLineup(f, ids);
+        if (emptyCount(lu)) return;
+        var pts = lineupPoints(lu);
+        if (!best || pts > best.pts) best = {lu: lu, pts: pts};
+      });
+      if (best){
+        state.lineup = best.lu;
+        state.lineupNote = 'Kein ' + POS_LABEL[hole.pos] + ' als Ersatz für ' + name + ': Formation auf ' + best.lu.formation + ' umgestellt.';
+      } else {
+        state.lineupNote = 'Für ' + name + ' gibt es keinen Ersatz im Kader.';
+      }
+    }
     saveLineup();
   }
 
@@ -2002,10 +2102,27 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     each('#body [data-sell]', function(b){
       b.addEventListener('click', function(){
         var id = b.getAttribute('data-sell');
+        state.lineupNote = null; state.pick = null;
         if (state.sell[id]) delete state.sell[id];
         else { state.sell[id] = true; removeFromLineup(id); }
         render();
       });
+    });
+    each('#body [data-assign]', function(b){
+      b.addEventListener('click', function(){
+        var s = state.pick.split(':');
+        assignSlot(s[0], +s[1], b.getAttribute('data-assign'));
+        state.pick = null; state.lineupNote = null;
+        render();
+      });
+    });
+    var pickCancel = $('pickCancel');
+    if (pickCancel) pickCancel.addEventListener('click', function(){ state.pick = null; render(); });
+    var slotClear = $('slotClear');
+    if (slotClear) slotClear.addEventListener('click', function(){
+      var s = state.pick.split(':');
+      state.lineup.slots[s[0]][+s[1]] = null;
+      state.pick = null; saveLineup(); render();
     });
     each('#body [data-kview]', function(b){
       b.addEventListener('click', function(){
@@ -2015,21 +2132,26 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       });
     });
     each('#body [data-formation]', function(b){
-      b.addEventListener('click', function(){ setFormation(b.getAttribute('data-formation')); render(); });
+      b.addEventListener('click', function(){ state.pick = null; state.lineupNote = null; setFormation(b.getAttribute('data-formation')); render(); });
     });
     each('#body [data-slot]', function(b){
       b.addEventListener('click', function(){
-        var s = b.getAttribute('data-slot').split(':');
-        openSlotSheet(s[0], +s[1]);
+        var key = b.getAttribute('data-slot');
+        state.pick = state.pick === key ? null : key;
+        state.lineupNote = null;
+        render();
+        var picker = document.querySelector('#body .picker');
+        if (picker && picker.scrollIntoView) picker.scrollIntoView({block: 'nearest', behavior: 'smooth'});
       });
     });
     each('#body [data-advice]', function(b){
       b.addEventListener('click', function(){ applyAdvice(b.getAttribute('data-advice')); render(); });
     });
     var kbBtn = $('lineupKb');
-    if (kbBtn) kbBtn.addEventListener('click', function(){ useKickbaseLineup(); saveLineup(); render(); });
+    if (kbBtn) kbBtn.addEventListener('click', function(){ state.pick = null; state.lineupNote = null; useKickbaseLineup(); saveLineup(); render(); });
     var auto = $('lineupAuto');
     if (auto) auto.addEventListener('click', function(){
+      state.pick = null; state.lineupNote = null;
       state.lineup = buildLineup(state.lineup.formation, bestIds());
       saveLineup(); render();
     });
@@ -2045,7 +2167,19 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       b.addEventListener('click', function(){
         var id = b.getAttribute('data-buy');
         var p = state.market.filter(function(x){ return x.id === id; })[0];
-        if (state.bids[id] != null) delete state.bids[id]; else state.bids[id] = p.price;
+        state.lineupNote = null;
+        if (state.bids[id] != null){
+          delete state.bids[id];
+          if (state.lineup) POS_ORDER.forEach(function(pos){
+            state.lineup.slots[pos].forEach(function(x, j){ if (x === id) state.lineup.slots[pos][j] = null; });
+          });
+        } else {
+          state.bids[id] = p.price;
+          // Fehlt auf seiner Position jemand, setzt die App den neuen Spieler gleich ein
+          var slots = state.lineup && state.lineup.slots[p.pos], free = slots ? slots.indexOf(null) : -1;
+          if (free >= 0){ slots[free] = id; state.lineupNote = p.name + ' ist eingeplant (Gebot ' + short(p.price) + ').'; }
+        }
+        saveLineup();
         render();
       });
     });
