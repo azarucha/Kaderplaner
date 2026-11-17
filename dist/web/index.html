@@ -474,7 +474,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
       <span><b>Demo ansehen</b><small>Mit erfundenen Daten, ohne Konto</small></span>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path></svg>
     </a>
-    <p class="fine">Dein Passwort geht nur an Kickbase und wird nicht gespeichert. Die App liest nur, sie bietet und verkauft nichts.</p>
+    <p class="fine">Dein Passwort wird nur zum Anmelden an Kickbase weitergereicht und nicht gespeichert. Die App liest nur, sie bietet und verkauft nichts.</p>
   </div>
 </section>
 
@@ -1269,9 +1269,77 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   var C = root.KBCalc;
   var API = "https://api.kickbase.com/v4";
 
+  // ---------- Zugang zur Kickbase-API ----------
+  // Seit November 2026 erlaubt Kickbase Browser-Anfragen (CORS) nur noch von
+  // play.kickbase.com. Deshalb geht nichts mehr direkt aus der Seite an die API:
+  //   Scriptable: der Wrapper holt die Daten nativ mit Request (kein CORS)
+  //   localhost:  tools/devserver.mjs leitet /kb/v4/... weiter
+  //   Web:        Proxy aus proxy/worker.js, Adresse kommt beim Build in __KP_API
+  // Erlaubt sind nur GET und der Login-POST, die App bleibt lesend.
+  function apiBase(){
+    if (root.__KP_API) return String(root.__KP_API).replace(/\/+$/, "");
+    var host = root.location && root.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1") return "/kb/v4";
+    return API;
+  }
+  function allowed(method, path){
+    return /^\/[^\/]/.test(path) && (method === "GET" || (method === "POST" && path === "/user/login"));
+  }
+  function blocked(){
+    var e = new Error("blocked"); e.blocked = true; return e;
+  }
+
+  // Scriptable-Bruecke: die Seite sammelt Anfragen, der Wrapper holt sie per
+  // evaluateJavaScript ab (take), laedt sie nativ und liefert die Antworten (deliver).
+  var bridgeQueue = [], bridgeWaiting = {}, bridgeSeq = 0, bridgeWake = null;
+  function bridgeFlush(){ var q = bridgeQueue; bridgeQueue = []; return JSON.stringify(q); }
+  root.__kpBridge = {
+    take: function(done){
+      if (bridgeQueue.length) return done(bridgeFlush());
+      var called = false;
+      var finish = function(){ if (called) return; called = true; bridgeWake = null; done(bridgeFlush()); };
+      bridgeWake = finish;
+      setTimeout(finish, 4000);
+    },
+    deliver: function(results){
+      (results || []).forEach(function(r){
+        var cb = bridgeWaiting[r.id];
+        delete bridgeWaiting[r.id];
+        if (cb) cb(r);
+      });
+    }
+  };
+  function bridgeFetch(method, path, init){
+    return new Promise(function(resolve, reject){
+      var id = ++bridgeSeq;
+      bridgeWaiting[id] = function(r){
+        if (!r.status) return reject(new TypeError("network"));
+        var body = r.body || "";
+        resolve({status: r.status, ok: r.status >= 200 && r.status < 300,
+          json: function(){ return Promise.resolve(body ? JSON.parse(body) : null); },
+          text: function(){ return Promise.resolve(body); }});
+      };
+      bridgeQueue.push({id: id, method: method, path: path, headers: init.headers || {}, body: init.body != null ? String(init.body) : null});
+      if (bridgeWake) bridgeWake();
+    });
+  }
+
+  // fetch-artiger Aufruf relativ zu /v4. Antwortet mit {status, ok, json()}.
+  function apiFetch(path, init){
+    init = init || {};
+    var method = (init.method || "GET").toUpperCase();
+    if (!allowed(method, path)) return Promise.reject(new Error("not-allowed"));
+    if (root.__KP_SCRIPTABLE && !root.__KP_DEMO) return bridgeFetch(method, path, init);
+    var base = apiBase();
+    return fetch(base + path, init).catch(function(err){
+      // Direkt an api.kickbase.com scheitert im Browser jetzt immer an CORS
+      throw base === API ? blocked() : err;
+    });
+  }
+
   function createClient(getToken){
     function get(path){
-      return fetch(API + path, {headers: {"Authorization": "Bearer " + getToken(), "Accept": "application/json"}})
+      return apiFetch(path, {headers: {"Authorization": "Bearer " + getToken(), "Accept": "application/json"}})
         .then(function(res){
           if (res.status === 401 || res.status === 403){ var e = new Error("auth"); e.auth = true; throw e; }
           if (!res.ok) throw new Error("http-" + res.status);
@@ -1774,7 +1842,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     return {games: games, factor: C.horizonFactor(games.map(function(g){ return g.f; }), horizon)};
   }
 
-  root.KBData = { createClient: createClient, pool: pool, estimateAll: estimateAll, fetchTransfers: fetchTransfers, fetchForms: fetchForms, fetchPlayerDetail: fetchPlayerDetail, fetchMarkups: fetchMarkups,
+  root.KBData = { apiFetch: apiFetch, createClient: createClient, pool: pool, estimateAll: estimateAll, fetchTransfers: fetchTransfers, fetchForms: fetchForms, fetchPlayerDetail: fetchPlayerDetail, fetchMarkups: fetchMarkups,
     fetchOpponentModel: fetchOpponentModel, buildOpponentModel: buildOpponentModel, fixturesFor: fixturesFor, mapTeams: mapTeams, normName: normName };
 })(typeof self !== 'undefined' ? self : this);
 
@@ -2117,7 +2185,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     if (!email || !pass) return;
     els.setupStatus.innerHTML = "";
     btn.disabled = true; btn.textContent = "Melde an …";
-    fetch("https://api.kickbase.com/v4/user/login", {
+    KBData.apiFetch("/user/login", {
       method: "POST",
       headers: {"Content-Type": "application/json", "Accept": "application/json"},
       body: JSON.stringify({em: email, pass: pass, loy: false, rep: {}})
@@ -2134,6 +2202,7 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
     }).catch(function(err){
       var msg = err.message === "credentials" ? "E-Mail oder Passwort stimmt nicht."
         : err.message === "token" ? "Kickbase hat keinen gültigen Token geliefert. Versuch es mit dem Token-Weg darunter."
+        : err.blocked ? BLOCKED_MSG
         : "Kickbase ist gerade nicht erreichbar. Prüf dein Netz und versuch es nochmal.";
       if (!els.setupStatus.innerHTML) els.setupStatus.innerHTML = '<p class="status-msg">' + msg + '</p>';
     }).then(function(){ btn.disabled = false; btn.textContent = "Anmelden"; });
@@ -2161,7 +2230,14 @@ code{ font:12px ui-monospace, Menlo, monospace; background:var(--chip); padding:
   els.sideLogout.addEventListener('click', logout);
 
   // ---------- Fehler ----------
+  var BLOCKED_MSG = "Kickbase lässt Browser seit November 2026 nicht mehr direkt an die Daten. " +
+    "Diese Version der Web-App hat noch keinen Weg drumherum. Nutz bis dahin die iPhone-App über Scriptable.";
   function showError(err, retry){
+    if (err && err.blocked){
+      els.body.innerHTML = '<div class="empty">' + BLOCKED_MSG + '<br><button class="text-btn" id="reAuth">Zurück</button></div>';
+      $('reAuth').addEventListener('click', logout);
+      return;
+    }
     if (err && err.auth){
       els.body.innerHTML = '<div class="empty">Kickbase hat die Anmeldung abgelehnt, vermutlich ist sie abgelaufen.<br><button class="text-btn" id="reAuth">Neu anmelden</button></div>';
       $('reAuth').addEventListener('click', logout);

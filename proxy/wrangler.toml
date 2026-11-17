@@ -1,0 +1,10 @@
+# Cloudflare Worker: Kickbase-Proxy fuer die Web-App (siehe README.md hier im Ordner)
+# Deploy: npx wrangler deploy --config proxy/wrangler.toml
+name = "kaderplaner-proxy"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+workers_dev = true
+
+# Keine Logs: der Worker sieht Login-Daten und Token
+[observability]
+enabled = false

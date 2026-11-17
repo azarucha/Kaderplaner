@@ -129,8 +129,11 @@ dann zum Mittel gezogen. Pokal- und Europapokalspiele zählen nicht.
 ### Als Web-App
 
 [azarucha.github.io/Kaderplaner](https://azarucha.github.io/Kaderplaner/) ist eine
-statische Web-App (PWA) ohne Server-Anteil: Login mit Kickbase-E-Mail und Passwort,
-das Passwort geht direkt an Kickbase und wird nicht gespeichert. Auf dem iPhone in
+statische Web-App (PWA): Login mit Kickbase-E-Mail und Passwort, das Passwort wird
+nicht gespeichert. Weil Kickbase Browser seit November 2026 nur noch von
+`play.kickbase.com` an die API lässt, geht die Web-App über einen kleinen Proxy
+(Cloudflare Worker, siehe [`proxy/README.md`](proxy/README.md)). Die Scriptable-App
+braucht keinen, sie lädt die Daten nativ. Auf dem iPhone in
 Safari öffnen und über *Teilen → Zum Home-Bildschirm* installieren. Unter
 [`demo.html`](https://azarucha.github.io/Kaderplaner/demo.html) läuft dieselbe App
 mit erfundenen Daten, ganz ohne Kickbase-Konto. Gebaut wird sie aus `dist/web/` bei
@@ -210,10 +213,12 @@ Schritt gegen den echten Kontostand geprüft, bis die Abweichung im Rauschen lag
 
 ## Datenschutz
 
-- Es gibt keinen eigenen Server, kein Tracking und keine Werbung. Die App ist eine
-  statische Seite, die direkt im Browser mit `api.kickbase.com` (und für Ergebnisse
-  mit `api.openligadb.de`) spricht.
-- E-Mail und Passwort gehen beim Anmelden nur an Kickbase und werden nicht
+- Kein Tracking und keine Werbung. Die Scriptable-App spricht direkt mit
+  `api.kickbase.com`. Die Web-App geht dafür über den Proxy in
+  [`proxy/worker.js`](proxy/worker.js), weil Kickbase Browser-Anfragen von fremden
+  Seiten blockt; der Worker reicht nur GET-Aufrufe und den Login weiter und speichert
+  oder loggt nichts. Ergebnisse kommen von `api.openligadb.de`.
+- E-Mail und Passwort werden beim Anmelden nur an Kickbase weitergereicht und nicht
   gespeichert. Auf dem Gerät bleibt nur der Zugangstoken (im Browser-Speicher bzw.
   in der iOS-Keychain), bis du dich abmeldest.
 - Die Schrift [Geist](https://github.com/vercel/geist-font) wird mitgeliefert

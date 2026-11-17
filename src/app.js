@@ -166,7 +166,7 @@
     if (!email || !pass) return;
     els.setupStatus.innerHTML = "";
     btn.disabled = true; btn.textContent = "Melde an …";
-    fetch("https://api.kickbase.com/v4/user/login", {
+    KBData.apiFetch("/user/login", {
       method: "POST",
       headers: {"Content-Type": "application/json", "Accept": "application/json"},
       body: JSON.stringify({em: email, pass: pass, loy: false, rep: {}})
@@ -183,6 +183,7 @@
     }).catch(function(err){
       var msg = err.message === "credentials" ? "E-Mail oder Passwort stimmt nicht."
         : err.message === "token" ? "Kickbase hat keinen gültigen Token geliefert. Versuch es mit dem Token-Weg darunter."
+        : err.blocked ? BLOCKED_MSG
         : "Kickbase ist gerade nicht erreichbar. Prüf dein Netz und versuch es nochmal.";
       if (!els.setupStatus.innerHTML) els.setupStatus.innerHTML = '<p class="status-msg">' + msg + '</p>';
     }).then(function(){ btn.disabled = false; btn.textContent = "Anmelden"; });
@@ -210,7 +211,14 @@
   els.sideLogout.addEventListener('click', logout);
 
   // ---------- Fehler ----------
+  var BLOCKED_MSG = "Kickbase lässt Browser seit November 2026 nicht mehr direkt an die Daten. " +
+    "Diese Version der Web-App hat noch keinen Weg drumherum. Nutz bis dahin die iPhone-App über Scriptable.";
   function showError(err, retry){
+    if (err && err.blocked){
+      els.body.innerHTML = '<div class="empty">' + BLOCKED_MSG + '<br><button class="text-btn" id="reAuth">Zurück</button></div>';
+      $('reAuth').addEventListener('click', logout);
+      return;
+    }
     if (err && err.auth){
       els.body.innerHTML = '<div class="empty">Kickbase hat die Anmeldung abgelehnt, vermutlich ist sie abgelaufen.<br><button class="text-btn" id="reAuth">Neu anmelden</button></div>';
       $('reAuth').addEventListener('click', logout);

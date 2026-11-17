@@ -6,9 +6,77 @@
   var C = root.KBCalc;
   var API = "https://api.kickbase.com/v4";
 
+  // ---------- Zugang zur Kickbase-API ----------
+  // Seit November 2026 erlaubt Kickbase Browser-Anfragen (CORS) nur noch von
+  // play.kickbase.com. Deshalb geht nichts mehr direkt aus der Seite an die API:
+  //   Scriptable: der Wrapper holt die Daten nativ mit Request (kein CORS)
+  //   localhost:  tools/devserver.mjs leitet /kb/v4/... weiter
+  //   Web:        Proxy aus proxy/worker.js, Adresse kommt beim Build in __KP_API
+  // Erlaubt sind nur GET und der Login-POST, die App bleibt lesend.
+  function apiBase(){
+    if (root.__KP_API) return String(root.__KP_API).replace(/\/+$/, "");
+    var host = root.location && root.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1") return "/kb/v4";
+    return API;
+  }
+  function allowed(method, path){
+    return /^\/[^\/]/.test(path) && (method === "GET" || (method === "POST" && path === "/user/login"));
+  }
+  function blocked(){
+    var e = new Error("blocked"); e.blocked = true; return e;
+  }
+
+  // Scriptable-Bruecke: die Seite sammelt Anfragen, der Wrapper holt sie per
+  // evaluateJavaScript ab (take), laedt sie nativ und liefert die Antworten (deliver).
+  var bridgeQueue = [], bridgeWaiting = {}, bridgeSeq = 0, bridgeWake = null;
+  function bridgeFlush(){ var q = bridgeQueue; bridgeQueue = []; return JSON.stringify(q); }
+  root.__kpBridge = {
+    take: function(done){
+      if (bridgeQueue.length) return done(bridgeFlush());
+      var called = false;
+      var finish = function(){ if (called) return; called = true; bridgeWake = null; done(bridgeFlush()); };
+      bridgeWake = finish;
+      setTimeout(finish, 4000);
+    },
+    deliver: function(results){
+      (results || []).forEach(function(r){
+        var cb = bridgeWaiting[r.id];
+        delete bridgeWaiting[r.id];
+        if (cb) cb(r);
+      });
+    }
+  };
+  function bridgeFetch(method, path, init){
+    return new Promise(function(resolve, reject){
+      var id = ++bridgeSeq;
+      bridgeWaiting[id] = function(r){
+        if (!r.status) return reject(new TypeError("network"));
+        var body = r.body || "";
+        resolve({status: r.status, ok: r.status >= 200 && r.status < 300,
+          json: function(){ return Promise.resolve(body ? JSON.parse(body) : null); },
+          text: function(){ return Promise.resolve(body); }});
+      };
+      bridgeQueue.push({id: id, method: method, path: path, headers: init.headers || {}, body: init.body != null ? String(init.body) : null});
+      if (bridgeWake) bridgeWake();
+    });
+  }
+
+  // fetch-artiger Aufruf relativ zu /v4. Antwortet mit {status, ok, json()}.
+  function apiFetch(path, init){
+    init = init || {};
+    var method = (init.method || "GET").toUpperCase();
+    if (!allowed(method, path)) return Promise.reject(new Error("not-allowed"));
+    if (root.__KP_SCRIPTABLE && !root.__KP_DEMO) return bridgeFetch(method, path, init);
+    var base = apiBase();
+    return fetch(base + path, init).catch(function(err){
+      // Direkt an api.kickbase.com scheitert im Browser jetzt immer an CORS
+      throw base === API ? blocked() : err;
+    });
+  }
+
   function createClient(getToken){
     function get(path){
-      return fetch(API + path, {headers: {"Authorization": "Bearer " + getToken(), "Accept": "application/json"}})
+      return apiFetch(path, {headers: {"Authorization": "Bearer " + getToken(), "Accept": "application/json"}})
         .then(function(res){
           if (res.status === 401 || res.status === 403){ var e = new Error("auth"); e.auth = true; throw e; }
           if (!res.ok) throw new Error("http-" + res.status);
@@ -511,6 +579,6 @@
     return {games: games, factor: C.horizonFactor(games.map(function(g){ return g.f; }), horizon)};
   }
 
-  root.KBData = { createClient: createClient, pool: pool, estimateAll: estimateAll, fetchTransfers: fetchTransfers, fetchForms: fetchForms, fetchPlayerDetail: fetchPlayerDetail, fetchMarkups: fetchMarkups,
+  root.KBData = { apiFetch: apiFetch, createClient: createClient, pool: pool, estimateAll: estimateAll, fetchTransfers: fetchTransfers, fetchForms: fetchForms, fetchPlayerDetail: fetchPlayerDetail, fetchMarkups: fetchMarkups,
     fetchOpponentModel: fetchOpponentModel, buildOpponentModel: buildOpponentModel, fixturesFor: fixturesFor, mapTeams: mapTeams, normName: normName };
 })(typeof self !== 'undefined' ? self : this);

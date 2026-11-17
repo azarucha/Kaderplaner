@@ -8,3 +8,6 @@ private/
 
 # lokale Claude-Code-Dateien und Worktrees
 .claude/
+
+# Wrangler-Cache (Cloudflare-Proxy)
+.wrangler/

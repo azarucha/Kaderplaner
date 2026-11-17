@@ -47,7 +47,47 @@ async function runApp() {
     return false;
   };
   await webView.loadHTML(html);
+  // Kickbase laesst Browser (auch den WebView) nur noch von play.kickbase.com zu.
+  // Deshalb holt die Seite alle API-Aufrufe ueber diese Schleife: abholen, nativ
+  // laden, Antworten beim naechsten Abholen zurueckgeben. Immer nur ein
+  // evaluateJavaScript gleichzeitig.
+  let open = true;
+  const pump = async () => {
+    let results = [];
+    while (open) {
+      let raw;
+      try {
+        raw = await webView.evaluateJavaScript(
+          "window.__kpBridge.deliver(" + JSON.stringify(results) + ");window.__kpBridge.take(completion);", true);
+      } catch (e) {
+        return;
+      }
+      const requests = raw ? JSON.parse(raw) : [];
+      results = await Promise.all(requests.map(nativeRequest));
+    }
+  };
+  pump();
   await webView.present(true);
+  open = false;
+}
+
+// Nur GET und der Login-POST, wie in src/data.js. Der Pfad haengt immer hinter /v4.
+async function nativeRequest(r) {
+  const method = String(r.method || "GET").toUpperCase();
+  const path = String(r.path || "");
+  const ok = /^\/[^\/]/.test(path) && (method === "GET" || (method === "POST" && path === "/user/login"));
+  if (!ok) return { id: r.id, status: 0 };
+  try {
+    const req = new Request(API + path);
+    req.method = method;
+    req.headers = r.headers || {};
+    if (r.body != null) req.body = r.body;
+    req.timeoutInterval = 30;
+    const body = await req.loadString();
+    return { id: r.id, status: (req.response && req.response.statusCode) || 0, body };
+  } catch (e) {
+    return { id: r.id, status: 0 };
+  }
 }
 
 // ------------------------------------------------------------- Widget

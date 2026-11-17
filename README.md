@@ -128,10 +128,13 @@ the values get pulled toward the average. Cup and European games don't count.
 ### As a web app
 
 [azarucha.github.io/Kaderplaner](https://azarucha.github.io/Kaderplaner/) is a static
-web app (PWA) with no server of its own. You log in with your Kickbase email and
-password; the password goes straight to Kickbase and isn't stored. On the iPhone, open
-it in Safari and use *Share → Add to Home Screen*. The same app runs with made-up data
-at [`demo.html`](https://azarucha.github.io/Kaderplaner/demo.html), no Kickbase account
+web app (PWA). You log in with your Kickbase email and password; the password isn't
+stored. Since November 2026 Kickbase only lets browsers reach its API from
+`play.kickbase.com`, so the web app goes through a small proxy (Cloudflare Worker, see
+[`proxy/README.md`](proxy/README.md)). The Scriptable app doesn't need one, it loads
+the data natively. On the iPhone, open it in Safari and use *Share → Add to Home
+Screen*. The same app runs with made-up data at
+[`demo.html`](https://azarucha.github.io/Kaderplaner/demo.html), no Kickbase account
 needed. It's built from `dist/web/` on every push to `main`.
 
 ### As a Scriptable app with widget
@@ -205,12 +208,14 @@ real balance until the difference was down in the noise.
 
 ## Privacy
 
-- There's no server of my own, no tracking and no ads. The app is a static page that
-  talks to `api.kickbase.com` straight from your browser (and to `api.openligadb.de`
-  for match results).
-- When you log in, your email and password go only to Kickbase and aren't stored. The
-  only thing kept on your device is the access token (in browser storage or the iOS
-  keychain) until you log out.
+- No tracking and no ads. The Scriptable app talks to `api.kickbase.com` directly.
+  The web app goes through the proxy in [`proxy/worker.js`](proxy/worker.js), because
+  Kickbase blocks browser requests from other sites; the worker only forwards GET
+  requests and the login and doesn't store or log anything. Match results come from
+  `api.openligadb.de`.
+- When you log in, your email and password are only passed on to Kickbase and aren't
+  stored. The only thing kept on your device is the access token (in browser storage or
+  the iOS keychain) until you log out.
 - The [Geist](https://github.com/vercel/geist-font) font ships with the app (SIL Open
   Font License). No fonts or scripts are loaded from third-party servers.
 - For the opponent factor the app fetches public match results from

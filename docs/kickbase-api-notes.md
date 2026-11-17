@@ -10,6 +10,15 @@ bis auf **50.000 €** (bei rund 960 Mio Transfervolumen). Dieselbe Rechnung lä
 für jeden Gegner aufstellen, weil alle Bestandteile über öffentliche Endpunkte
 abrufbar oder ableitbar sind.
 
+## CORS seit November 2026
+
+Gemessen am 17.11.2026: `api.kickbase.com` schickt `Access-Control-Allow-Origin` nur
+noch für `https://play.kickbase.com` (Preflight und Antwort, GET wie POST). Für jede
+andere Origin, auch `null` aus einem WebView, fehlen die Header, der Browser blockt
+Login und Datenabrufe. Ohne Origin-Header (curl, Scriptable `Request`, Server) antwortet
+die API unverändert. Deshalb lädt die Scriptable-App alle Aufrufe nativ über den
+Wrapper, die Web-App über einen Proxy (`proxy/worker.js`, lokal `tools/devserver.mjs`).
+
 ```
 Kontostand = Startbudget                       /leagues/{L}/overview  b
            − Käufe + Verkäufe                  /leagues/{L}/managers/{U}/transfer

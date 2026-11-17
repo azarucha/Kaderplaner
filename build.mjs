@@ -28,7 +28,11 @@ write('dist/Kaderplaner.js', scriptable);
 
 // Web-App: gleiche Oberflaeche plus Manifest, Service Worker und Icons.
 const head = read('web/head.html');
-const index = page({ head });
+// Kickbase-Proxy fuer die Web-App (siehe proxy/README.md). Ohne Proxy meldet die
+// Web-App beim Login, dass Kickbase den Browser blockt.
+const apiBase = (process.env.KP_API_BASE || '').trim();
+if (apiBase && !/^https:\/\/[^\s"'<>]+$/.test(apiBase)) { console.error('KP_API_BASE muss eine https-Adresse sein'); process.exit(1); }
+const index = page({ head, boot: apiBase ? 'window.__KP_API=' + JSON.stringify(apiBase) + ';' : '' });
 const demo = page({ head, script: read('tools/mock.js') + '\n' + js });
 const version = crypto.createHash('sha1').update(index + demo).digest('hex').slice(0, 10);
 fs.rmSync(path.join(root, 'dist/web'), { recursive: true, force: true });
@@ -42,7 +46,7 @@ fs.cpSync(path.join(root, 'web/fonts'), path.join(root, 'dist/web/fonts'), { rec
 write('dist/web/.nojekyll', '');
 
 console.log(`dist/Kaderplaner.js  ${(scriptable.length / 1024).toFixed(1)} KB`);
-console.log(`dist/web/            Version ${version}`);
+console.log(`dist/web/            Version ${version}${apiBase ? ', API über ' + apiBase : ', ohne Proxy'}`);
 
 if (process.argv.includes('--deploy')) {
   const dir = process.env.SCRIPTABLE_DIR ||

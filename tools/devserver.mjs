@@ -39,6 +39,9 @@ http.createServer((req, res) => {
     });
     return;
   }
+  // Kickbase-Proxy fuer die Web-App auf localhost (Kickbase erlaubt CORS nur noch
+  // fuer play.kickbase.com). Gleiche Regeln wie proxy/worker.js.
+  if (req.url.startsWith('/kb/v4/')) return proxyKickbase(req, res);
   const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname).replace(/^\/+/, '');
   if (!rel) { res.writeHead(302, { Location: '/dist/web/' }); return res.end(); }
   let file = path.resolve(root, rel);
@@ -47,3 +50,25 @@ http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
   fs.createReadStream(file).pipe(res);
 }).listen(8787, '127.0.0.1', () => console.log('http://localhost:8787'));
+
+async function proxyKickbase(req, res) {
+  const url = new URL(req.url, 'http://x');
+  const apiPath = url.pathname.slice('/kb'.length);
+  const method = req.method;
+  if (!(method === 'GET' || (method === 'POST' && apiPath === '/v4/user/login'))) { res.writeHead(405); return res.end(); }
+  const headers = {};
+  for (const h of ['authorization', 'content-type', 'accept']) if (req.headers[h]) headers[h] = req.headers[h];
+  let body;
+  if (method === 'POST') {
+    const chunks = [];
+    for await (const c of req) chunks.push(c);
+    body = Buffer.concat(chunks);
+  }
+  try {
+    const up = await fetch('https://api.kickbase.com' + apiPath + url.search, { method, headers, body });
+    res.writeHead(up.status, { 'Content-Type': up.headers.get('content-type') || 'application/json' });
+    res.end(Buffer.from(await up.arrayBuffer()));
+  } catch (e) {
+    res.writeHead(502); res.end();
+  }
+}
